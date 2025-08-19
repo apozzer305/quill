@@ -119,6 +119,7 @@ public:
    * @param open_mode open mode for the file.
    */
   QUILL_ATTRIBUTE_COLD void set_open_mode(char open_mode) { _open_mode = open_mode; }
+  QUILL_ATTRIBUTE_COLD void set_open_mode(std::string const& open_mode) { _open_mode = open_mode; }
 
   /**
    * @brief Sets the user-defined buffer size for fwrite operations.
