@@ -19,14 +19,16 @@
 #include "quill/core/Rdtsc.h"
 #include "quill/core/ThreadPrimitives.h"
 
-#include <atomic>
-#include <cstddef>
-#include <cstdint>
-#include <cstring>
-#include <memory>
-#include <string>
-#include <type_traits>
-#include <vector>
+#ifndef QUILL_MODULE
+  #include <atomic>
+  #include <cstddef>
+  #include <cstdint>
+  #include <cstring>
+  #include <memory>
+  #include <string>
+  #include <type_traits>
+  #include <vector>
+#endif
 
 QUILL_BEGIN_NAMESPACE
 

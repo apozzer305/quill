@@ -11,10 +11,12 @@
 #include "quill/core/QuillError.h"
 #include "quill/core/Spinlock.h"
 
-#include <algorithm>
-#include <memory>
-#include <string>
-#include <vector>
+#ifndef QUILL_MODULE
+  #include <algorithm>
+  #include <memory>
+  #include <string>
+  #include <vector>
+#endif
 
 QUILL_BEGIN_NAMESPACE
 
