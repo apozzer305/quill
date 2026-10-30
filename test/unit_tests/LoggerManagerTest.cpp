@@ -485,4 +485,63 @@ TEST_CASE("create_logger_succeeds_and_rejects_duplicate")
   lm.cleanup_invalidated_loggers([]() { return true; }, removed_loggers);
 }
 
+TEST_CASE("get_existing_logger_does_not_copy_source_clock")
+{
+  struct CopyTrackedClock
+  {
+    CopyTrackedClock(uint64_t value, size_t& copies, bool& reject)
+      : timestamp(value), copy_count(&copies), reject_copy(&reject)
+    {
+    }
+
+    CopyTrackedClock(CopyTrackedClock const& other)
+      : timestamp(other.timestamp), copy_count(other.copy_count), reject_copy(other.reject_copy)
+    {
+      ++*copy_count;
+#if !defined(QUILL_NO_EXCEPTIONS)
+      if (*reject_copy)
+      {
+        QUILL_THROW(QuillError{"Clock must not be copied during an existing logger lookup"});
+      }
+#endif
+    }
+
+    CopyTrackedClock(CopyTrackedClock&&) = default;
+    uint64_t now() const { return timestamp; }
+
+    uint64_t timestamp;
+    size_t* copy_count;
+    bool* reject_copy;
+  };
+
+  using ClockLogger = LoggerImpl<FrontendOptions, CopyTrackedClock>;
+  LoggerManager& manager = LoggerManager::instance();
+  size_t copies{0};
+  bool reject_copy{false};
+  auto* source = static_cast<ClockLogger*>(manager.create_logger<ClockLogger>(
+    "copy_clock_source", {}, PatternFormatterOptions{}, CopyTrackedClock{111, copies, reject_copy}));
+  auto* existing = static_cast<ClockLogger*>(manager.create_logger<ClockLogger>(
+    "copy_clock_existing", {}, PatternFormatterOptions{}, CopyTrackedClock{222, copies, reject_copy}));
+
+  reject_copy = true;
+  CHECK_EQ(manager.create_or_get_logger<ClockLogger>("copy_clock_existing", source), existing);
+  CHECK_EQ(manager.create_or_get_logger<ClockLogger>("copy_clock_source", source), source);
+  CHECK_EQ(manager.create_or_get_logger<ClockLogger>("copy_clock_existing", nullptr), existing);
+  CHECK_EQ(copies, 0);
+  CHECK_EQ(existing->get_clock().timestamp, 222);
+
+  // A new logger still copies the source clock and retains its state.
+  reject_copy = false;
+  auto* clone =
+    static_cast<ClockLogger*>(manager.create_or_get_logger<ClockLogger>("copy_clock_clone", source));
+  CHECK_EQ(copies, 1);
+  CHECK_EQ(clone->get_clock().timestamp, 111);
+
+  manager.remove_logger(source);
+  manager.remove_logger(existing);
+  manager.remove_logger(clone);
+  std::vector<std::string> removed;
+  manager.cleanup_invalidated_loggers([]() { return true; }, removed);
+}
+
 TEST_SUITE_END();

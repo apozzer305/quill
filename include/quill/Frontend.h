@@ -365,8 +365,8 @@ public:
    * This function allows you to create or obtain a logger identified by `logger_name`. If a logger with the
    * same name already exists, its configuration options will be used. If it does not exist, a new logger
    * will be created with the same options as the provided `source_logger`.
-   * The clock object or pointer is copied. A new logger with a move-only clock must be
-   * created with an explicit clock argument instead.
+   * The clock object or pointer is copied only when creating a new logger. To create a new
+   * logger with a move-only clock, pass that clock explicitly instead.
    *
    * @param logger_name The name of the logger to create or retrieve.
    * @param source_logger The logger from which to copy the configuration options.

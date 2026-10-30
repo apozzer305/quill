@@ -109,6 +109,8 @@
 - Logger clocks are now selected at compile time using `TscClock`, `SystemClock`, or a concrete
   custom clock object/pointer. System and custom clocks use the inline logging path without virtual clock dispatch;
   replace clock enum arguments and `UserClockSource` inheritance with the new clock API.
+- `Frontend::create_or_get_logger(name, source_logger)` retrieves existing loggers without copying
+  the source clock, so lookups do not fail if a custom clock's copy constructor throws.
 - On macOS, `%(thread_name)` now shows thread names longer than 15 characters in full instead of
   only their first 15 characters.
 

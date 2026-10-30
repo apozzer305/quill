@@ -290,9 +290,10 @@ public:
   template <typename TLogger>
   LoggerBase* create_or_get_logger(std::string const& logger_name, TLogger* source_logger)
   {
-    if (!source_logger)
+    LoggerBase* existing = get_logger(logger_name);
+    if (existing || !source_logger)
     {
-      return get_logger(logger_name);
+      return existing;
     }
 
     if constexpr (std::is_copy_constructible_v<typename TLogger::clock_t>)
@@ -302,11 +303,6 @@ public:
     }
     else
     {
-      LoggerBase* existing = get_logger(logger_name);
-      if (existing)
-      {
-        return existing;
-      }
       QUILL_THROW(
         QuillError{"Cloning a logger requires a copyable clock. Create the logger with an explicit "
                    "clock instead."});
