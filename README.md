@@ -681,8 +681,8 @@ configure with:
 -DQUILL_NO_THREAD_NAME_SUPPORT:BOOL=ON
 ```
 
-For timestamps, use `quill::ClockSourceType::System`. Quill also includes an `AndroidSink` for
-Android's logging system.
+For timestamps, pass `quill::SystemClock{}` when creating a logger. Quill also includes an
+`AndroidSink` for Android's logging system.
 
 #### Minimal Example to Start Logging on Android
 
@@ -698,7 +698,7 @@ auto sink = quill::Frontend::create_or_get_sink<quill::AndroidSink>("app", [](){
 
 auto logger = quill::Frontend::create_or_get_logger("root", std::move(sink),
                                                     quill::PatternFormatterOptions {}, 
-                                                    quill::ClockSourceType::System);
+                                                    quill::SystemClock{});
 
 LOG_INFO(logger, "Test {}", 123);
 ```

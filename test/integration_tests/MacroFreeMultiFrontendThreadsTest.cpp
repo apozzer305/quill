@@ -45,13 +45,13 @@ TEST_CASE("macro_free_multi_frontend_threads")
           }(),
           FileEventNotifier{});
 
-        Logger* logger = Frontend::create_or_get_logger(
+        auto* logger = Frontend::create_or_get_logger(
           logger_name_prefix + std::to_string(i), std::move(file_sink),
           quill::PatternFormatterOptions{
             "%(time) [%(thread_id)] %(short_source_location:<28) LOG_%(log_level:<9) %(logger:<12) "
             "%(message)",
             "%Y-%m-%d %H:%M:%S.%Qns", Timezone::GmtTime, false},
-          ClockSourceType::System);
+          quill::SystemClock{});
 
         for (size_t j = 0; j < number_of_messages; ++j)
         {
@@ -67,7 +67,7 @@ TEST_CASE("macro_free_multi_frontend_threads")
   }
 
   // log from main thread - get logger from the first thread
-  Logger* t0_logger = Frontend::get_logger(logger_name_prefix + std::to_string(0));
+  auto* t0_logger = Frontend::get_logger<SystemClock>(logger_name_prefix + std::to_string(0));
   REQUIRE(t0_logger);
 
   t0_logger->set_log_level(quill::LogLevel::TraceL3);
@@ -88,7 +88,7 @@ TEST_CASE("macro_free_multi_frontend_threads")
   warning(null_logger, "null");
 
   // flush all log and remove all loggers
-  for (Logger* logger : Frontend::get_all_loggers())
+  for (auto* logger : Frontend::get_all_loggers<SystemClock>())
   {
     logger->flush_log();
     Frontend::remove_logger(logger);

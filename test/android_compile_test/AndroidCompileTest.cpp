@@ -17,9 +17,8 @@ int main()
   auto android_sink = quill::Frontend::create_or_get_sink<quill::AndroidSink>(
     "android_sink", std::move(sink_config));
 
-  quill::Logger* logger = quill::Frontend::create_or_get_logger(
-    "android_logger", std::move(android_sink), quill::PatternFormatterOptions{},
-    quill::ClockSourceType::System);
+  auto* logger = quill::Frontend::create_or_get_logger(
+    "android_logger", std::move(android_sink), quill::PatternFormatterOptions{}, quill::SystemClock{});
 
   LOG_INFO(logger, "Android compile test {}", 1);
 

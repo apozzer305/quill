@@ -25,9 +25,8 @@ QUILL_BEGIN_EXPORT
  * unless the derived type explicitly overrides them.
  *
  * @note FrontendOptions are intended to be an application-wide choice. Mixing different
- *       FrontendImpl<TFrontendOptions> or LoggerImpl<TFrontendOptions> specializations is not a
- *       supported configuration. Use one frontend specialization consistently throughout the
- *       application.
+ *       TFrontendOptions types is not a supported configuration. Use one set of frontend options
+ *       consistently throughout the application. Logger clock types may differ.
  *
  * @code
  * struct CustomFrontendOptions : FrontendOptions

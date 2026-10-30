@@ -33,10 +33,56 @@ There are several ways to get the timestamp on the frontend:
 
 - **System**: This method calls ``std::chrono::system_clock::now()`` on the frontend and pushes the wall time value to the queue. It is slower than TSC but provides the most accurate and immediately usable timestamps. The backend thread does not require any additional initialization time since the ``RdtscClock`` is not used.
 
-- **User**: This method allows the user to provide a custom timestamp in nanoseconds since epoch via ``UserClockSource``. This is useful, for example, in simulations where you want to display a custom timestamp rather than the current one in the log statements.
+- **User**: This method allows the user to provide a custom timestamp in nanoseconds since epoch through a concrete clock type with a ``uint64_t now() const`` member. This is useful, for example, in simulations where you want to display a custom timestamp rather than the current one in the log statements.
+
+Choosing a Clock
+----------------
+
+The clock implementation is selected at compile time. Logger creation defaults to
+``quill::TscClock``. Pass ``quill::SystemClock{}`` as the clock argument to use system time:
+
+.. code-block:: cpp
+
+   auto* logger = quill::Frontend::create_or_get_logger(
+     "main", sink, quill::PatternFormatterOptions{}, quill::SystemClock{});
+
+All clock types use the same inline logging path. TSC reads are inlined, and custom clock
+implementations can be inlined without a virtual call. System clock acquisition retains the
+cost of ``std::chrono::system_clock::now()``. Queue initialization, growth, blocking, and dropping
+are handled separately when needed.
+
+The clock type is part of ``LoggerImpl<TFrontendOptions, TClock>``. Use ``auto*`` for the returned
+logger, or an alias for its concrete type. ``quill::Logger`` remains the default TSC logger.
+Loggers with different clock types may coexist and share the same frontend queues; use the
+same ``TFrontendOptions`` throughout the application.
+
+For named lookup, specify the same clock type used at creation:
+
+.. code-block:: cpp
+
+   auto* logger = quill::Frontend::get_logger<quill::SystemClock>("main");
+
+``get_all_loggers<TClock>()`` and ``get_valid_logger<TClock>()`` select only loggers with that
+clock type and frontend options. Their default clock type is ``quill::TscClock``. A named lookup
+or ``create_or_get_logger`` with an incompatible type reports an error, including in builds
+without RTTI. Cloning from a typed logger preserves its clock object or pointer.
+When RTTI is disabled, use named clock and frontend-option types with external linkage and
+the same compiler when sharing typed loggers across shared libraries.
 
 Providing a Custom Timestamp
 ----------------------------
+
+A custom clock supplies ``uint64_t now() const`` returning nanoseconds since epoch. Pass a
+copyable or movable clock object by value, or a non-null pointer to an application-owned clock.
+Quill stores the object or pointer in the logger. Pointer-based clocks must remain alive until
+the logger is removed and no thread can log through it. Cloned loggers copy the clock object
+or share the pointed-to clock. Creating a new logger by cloning a move-only clock reports an
+error; pass a clock explicitly when creating that logger instead.
+
+Clock reads must be thread-safe when the logger is shared. Successive timestamps within a
+frontend queue should normally be non-decreasing; zero is a valid timestamp. Custom clocks
+bypass the wall-clock ordering grace check, so simulation time may be in the past or future.
+See ``BackendOptions::ensure_monotonic_output_timestamps`` for handling backward clock changes.
 
 .. literalinclude:: ../examples/user_clock_source.cpp
    :language: cpp

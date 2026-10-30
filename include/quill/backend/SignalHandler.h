@@ -256,7 +256,7 @@ private:
       static constexpr quill::MacroMetadata macro_metadata{                                        \
         "SignalHandler:~", "", fmt, nullptr, log_level, quill::MacroMetadata::Event::Log};         \
                                                                                                    \
-      logger->template log_statement<false>(&macro_metadata, ##__VA_ARGS__);                       \
+      logger->log_signal(&macro_metadata, ##__VA_ARGS__);                                          \
     }                                                                                              \
   } while (0)
 
@@ -314,7 +314,7 @@ void on_signal(int32_t signal_number)
     {
       char const* const signal_desc = get_signal_description(signal_number);
 
-      auto logger = static_cast<LoggerImpl<TFrontendOptions>*>(logger_base);
+      auto* logger = logger_base;
       QUILL_SIGNAL_HANDLER_LOG(logger, LogLevel::Info, "Received signal: {} (signum: {})",
                                signal_desc, signal_number);
 
@@ -322,7 +322,7 @@ void on_signal(int32_t signal_number)
       {
         // For SIGINT and SIGTERM, we are shutting down gracefully
         // Pass `0` to avoid calling std::this_thread::sleep_for()
-        logger->flush_log(0);
+        logger->flush_signal_handler();
         std::_Exit(EXIT_SUCCESS);
       }
 
@@ -333,11 +333,11 @@ void on_signal(int32_t signal_number)
                                  signal_desc, signal_number);
 
         // This is here in order to flush the above log statement
-        logger->flush_log(0);
+        logger->flush_signal_handler();
       }
       else
       {
-        logger->flush_log(0);
+        logger->flush_signal_handler();
       }
     }
 
@@ -452,12 +452,12 @@ BOOL WINAPI on_console_signal(DWORD signal)
 
     if (logger_base)
     {
-      auto logger = static_cast<LoggerImpl<TFrontendOptions>*>(logger_base);
+      auto* logger = logger_base;
       QUILL_SIGNAL_HANDLER_LOG(logger, LogLevel::Info,
                                "Program interrupted by Ctrl+C or Ctrl+Break signal");
 
       // Pass `0` to avoid calling std::this_thread::sleep_for()
-      logger->flush_log(0);
+      logger->flush_signal_handler();
       std::_Exit(EXIT_SUCCESS);
     }
   }
@@ -480,7 +480,7 @@ LONG WINAPI on_exception(EXCEPTION_POINTERS* exception_p)
 
     if (logger_base)
     {
-      auto logger = static_cast<LoggerImpl<TFrontendOptions>*>(logger_base);
+      auto* logger = logger_base;
 
       QUILL_SIGNAL_HANDLER_LOG(logger, LogLevel::Info, "Received exception: {} (Code: {})",
                                get_error_message(exception_p->ExceptionRecord->ExceptionCode),
@@ -492,7 +492,7 @@ LONG WINAPI on_exception(EXCEPTION_POINTERS* exception_p)
                                exception_p->ExceptionRecord->ExceptionCode);
 
       // Pass `0` to avoid calling std::this_thread::sleep_for()
-      logger->flush_log(0);
+      logger->flush_signal_handler();
     }
   }
 

@@ -2,7 +2,6 @@
 #include "quill/Frontend.h"
 #include "quill/LogMacros.h"
 #include "quill/Logger.h"
-#include "quill/UserClockSource.h"
 #include "quill/sinks/ConsoleSink.h"
 
 #include <atomic>
@@ -20,16 +19,15 @@
  * This class needs to be thread-safe, unless only a single thread in the application calling
  * LOG_ macros from the same logger
  */
-class SimulatedClock : public quill::UserClockSource
+class SimulatedClock
 {
 public:
   SimulatedClock() = default;
 
   /**
-   * Required by TimestampClock
    * @return current time now, in nanoseconds since epoch
    */
-  uint64_t now() const override { return _timestamp_ns.load(std::memory_order_relaxed); }
+  uint64_t now() const { return _timestamp_ns.load(std::memory_order_relaxed); }
 
   /**
    * set custom timestamp
@@ -52,7 +50,7 @@ int main()
   quill::BackendOptions backend_options;
   quill::Backend::start(backend_options);
 
-  // Create a simulated timestamp class. Quill takes a pointer to this class,
+  // Create a concrete simulated clock. Quill stores a typed pointer to it,
   // and the user is responsible for its lifetime.
   // Ensure that the instance of this class remains alive for as long as the logger
   // object exists, until the logger is removed.
@@ -61,12 +59,12 @@ int main()
   // Get the console sink and also create a logger using the simulated clock
   auto console_sink = quill::Frontend::create_or_get_sink<quill::ConsoleSink>("sink_id_1");
 
-  quill::Logger* logger = quill::Frontend::create_or_get_logger(
+  auto* logger = quill::Frontend::create_or_get_logger(
     "root", std::move(console_sink),
     quill::PatternFormatterOptions{
       "%(time) %(short_source_location:<28) LOG_%(log_level:<9) %(logger:<12) %(message)",
       "%D %H:%M:%S.%Qns", quill::Timezone::LocalTime, false},
-    quill::ClockSourceType::User, &simulated_clock);
+    &simulated_clock);
 
   // Change the LogLevel to print everything
   logger->set_log_level(quill::LogLevel::TraceL3);
@@ -80,4 +78,8 @@ int main()
   simulated_clock.set_timestamp(std::chrono::seconds{1655039000});
   LOG_INFO(logger, "This is a log info {} example", "string");
   LOG_DEBUG(logger, "This is a log debug example {}", 4);
+
+  // Remove the logger before destroying its application-owned clock.
+  quill::Frontend::remove_logger_blocking(logger);
+  quill::Backend::stop();
 }

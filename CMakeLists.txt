@@ -301,6 +301,7 @@ set(HEADER_FILES
         include/quill/Backend.h
         include/quill/BackendTscClock.h
         include/quill/BinaryDataDeferredFormatCodec.h
+        include/quill/ClockSource.h
         include/quill/CsvWriter.h
         include/quill/DeferredFormatCodec.h
         include/quill/DirectFormatCodec.h
@@ -312,7 +313,6 @@ set(HEADER_FILES
         include/quill/SimpleSetup.h
         include/quill/StopWatch.h
         include/quill/StringRef.h
-        include/quill/UserClockSource.h
         include/quill/Utility.h
 )
 

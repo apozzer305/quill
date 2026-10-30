@@ -1,6 +1,7 @@
 #include "doctest/doctest.h"
 
 #include "quill/Frontend.h"
+#include "quill/backend/ThreadUtilities.h"
 
 using namespace quill;
 

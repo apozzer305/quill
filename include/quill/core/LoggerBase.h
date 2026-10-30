@@ -17,6 +17,7 @@
   #include <atomic>
   #include <memory>
   #include <string>
+  #include <string_view>
   #include <vector>
 #endif
 
@@ -27,7 +28,7 @@ QUILL_BEGIN_EXPORT
 
 class Sink;
 class PatternFormatter;
-class UserClockSource;
+class MacroMetadata;
 
 QUILL_END_EXPORT
 
@@ -41,14 +42,33 @@ class LoggerManager;
 class LoggerBase
 {
 public:
+  struct FrontendFunctions
+  {
+    bool (*log_signal)(LoggerBase*, MacroMetadata const*, char const*, uint32_t);
+    void (*flush)(LoggerBase*);
+    std::string_view type_name;
+  };
+
+  QUILL_NODISCARD FrontendFunctions const* get_frontend_functions() const noexcept
+  {
+    return _frontend_functions;
+  }
+
+  bool log_signal(MacroMetadata const* metadata, char const* description = "", uint32_t code = 0)
+  {
+    return _frontend_functions->log_signal(this, metadata, description, code);
+  }
+
+  void flush_signal_handler() { _frontend_functions->flush(this); }
+
   /***/
   LoggerBase(std::string logger_name, std::vector<std::shared_ptr<Sink>> sinks,
              PatternFormatterOptions pattern_formatter_options, ClockSourceType clock_source,
-             UserClockSource* user_clock)
+             FrontendFunctions const* frontend_functions)
     : _logger_name(static_cast<std::string&&>(logger_name)),
-      _user_clock(user_clock),
       _clock_source(clock_source),
-      _pattern_formatter_options(static_cast<PatternFormatterOptions&&>(pattern_formatter_options))
+      _pattern_formatter_options(static_cast<PatternFormatterOptions&&>(pattern_formatter_options)),
+      _frontend_functions(frontend_functions)
   {
     for (auto const& sink : sinks)
     {
@@ -73,12 +93,6 @@ public:
    * @return A constant reference to the logger's name.
    */
   QUILL_NODISCARD std::string const& get_logger_name() const noexcept { return _logger_name; }
-
-  /**
-   * Returns the user-defined clock source.
-   * @return A pointer to the constant UserClockSource object.
-   */
-  QUILL_NODISCARD UserClockSource* get_user_clock_source() const noexcept { return _user_clock; }
 
   /**
    * Returns the type of clock source being used.
@@ -217,7 +231,6 @@ protected:
 
   // -- frontend access BEGIN --
   std::string _logger_name; /* Set by the frontend once, accessed by the frontend AND backend */
-  UserClockSource* _user_clock{nullptr}; /* A non-owned pointer to a custom timestamp clock, valid only when provided. used by frontend only */
   std::atomic<uint32_t> _message_flush_threshold{0};   /* used by frontend only */
   std::atomic<uint32_t> _messages_since_last_flush{0}; /* used by frontend only */
   ClockSourceType const _clock_source; /* Set once during construction and accessed by the frontend AND backend */
@@ -230,6 +243,7 @@ protected:
   PatternFormatterOptions _pattern_formatter_options; /* Set by the frontend once and accessed by the backend to initialise PatternFormatter */
   std::vector<std::shared_ptr<Sink>> _sinks; /* Set by the frontend once and accessed by the backend */
   std::shared_ptr<PatternFormatter> _pattern_formatter; /* The backend thread will set this once, we never access it on the frontend */
+  FrontendFunctions const* const _frontend_functions; /* Cold frontend dispatch and logger type identity. */
   std::shared_ptr<BacktraceStorage> _backtrace_storage; /* The backend thread will construct this, we never access it on the frontend */
 };
 } // namespace detail

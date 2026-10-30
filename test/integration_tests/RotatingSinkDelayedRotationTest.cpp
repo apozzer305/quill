@@ -4,7 +4,6 @@
 #include "quill/Backend.h"
 #include "quill/Frontend.h"
 #include "quill/LogMacros.h"
-#include "quill/UserClockSource.h"
 #include "quill/sinks/RotatingFileSink.h"
 
 #include <atomic>
@@ -21,10 +20,10 @@ using namespace quill;
 
 namespace
 {
-class TestUserClockSource : public UserClockSource
+class TestSimulationClock
 {
 public:
-  uint64_t now() const override { return _timestamp.load(std::memory_order_relaxed); }
+  uint64_t now() const { return _timestamp.load(std::memory_order_relaxed); }
 
   void set_timestamp(std::chrono::nanoseconds timestamp)
   {
@@ -63,7 +62,7 @@ TEST_CASE("rotating_sink_delayed_rotation")
   static constexpr char const* base_filename = "rotating_sink_delayed_rotation.log";
   static std::string const logger_name = "rotating_sink_delayed_rotation_logger";
 
-  TestUserClockSource user_clock;
+  TestSimulationClock user_clock;
 
   // Start at a known epoch — pick a value with even seconds so the boundary math is easy.
   // 2026-01-02 12:00:00 UTC = 1767355200 seconds
@@ -92,10 +91,9 @@ TEST_CASE("rotating_sink_delayed_rotation")
     }(),
     FileEventNotifier{}, start_time);
 
-  Logger* logger = Frontend::create_or_get_logger(
+  auto* logger = Frontend::create_or_get_logger(
     logger_name, std::move(rotating_sink),
-    PatternFormatterOptions{"%(message)", "%H:%M:%S.%Qns", Timezone::GmtTime, false},
-    ClockSourceType::User, &user_clock);
+    PatternFormatterOptions{"%(message)", "%H:%M:%S.%Qns", Timezone::GmtTime, false}, &user_clock);
 
   // First log at t0 — opens the file with _open_file_timestamp = t0
   LOG_INFO(logger, "first at t0");

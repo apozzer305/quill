@@ -162,4 +162,39 @@ TEST_CASE("unbounded_queue_read_write_multithreaded_plain_ints")
   REQUIRE(buffer.empty());
 }
 
+TEST_CASE("unbounded_queue_recovered_write_reservation")
+{
+  UnboundedSPSCQueue queue{1024, 2048};
+  auto first = queue.prepare_write_reserve(1024);
+  REQUIRE(first.write_buffer);
+  first.bounded_queue->finish_and_commit_write_reservation(first.writer_pos + 1024);
+  CHECK_FALSE(queue.prepare_write_reserve_cached(8).write_buffer);
+
+  // Growth changes the producer. Commit through the returned queue, not the old one.
+  auto recovered = queue.prepare_write_reserve(8);
+  REQUIRE(recovered.write_buffer);
+  CHECK_NE(recovered.bounded_queue, first.bounded_queue);
+  CHECK_EQ(recovered.writer_pos, 0);
+  recovered.write_buffer[0] = std::byte{42};
+  recovered.bounded_queue->finish_and_commit_write_reservation(recovered.writer_pos + 8);
+
+  REQUIRE(queue.prepare_read().read_pos);
+  queue.finish_read(1024);
+  queue.commit_read();
+  auto const next = queue.prepare_read();
+  REQUIRE(next.read_pos);
+  CHECK(next.allocation);
+  CHECK_EQ(next.read_pos[0], std::byte{42});
+  queue.finish_read(8);
+  queue.commit_read();
+  CHECK_FALSE(queue.prepare_read().read_pos);
+
+  // A failed reservation must remain empty when the configured capacity limit is reached.
+  auto const full = queue.prepare_write_reserve(2048);
+  REQUIRE(full.write_buffer);
+  full.bounded_queue->finish_and_commit_write_reservation(full.writer_pos + 2048);
+  auto const failed = queue.prepare_write_reserve(1);
+  CHECK_FALSE(failed.write_buffer);
+}
+
 TEST_SUITE_END();

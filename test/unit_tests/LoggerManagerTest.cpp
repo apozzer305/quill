@@ -1,6 +1,7 @@
 #include "doctest/doctest.h"
 
 #include "quill/Logger.h"
+#include "quill/backend/ThreadUtilities.h"
 #include "quill/core/LoggerManager.h"
 #include "quill/sinks/ConsoleSink.h"
 
@@ -24,14 +25,14 @@ TEST_CASE("create_get_remove_logger")
     PatternFormatterOptions{"%(time) [%(thread_id)] %(short_source_location:<28) "
                             "LOG_%(log_level:<9) %(logger:<12) %(message)",
                             "%H:%M:%S.%Qns", quill::Timezone::GmtTime, false},
-    ClockSourceType::Tsc, nullptr);
+    TscClock{});
 
   LoggerBase* logger_2 = lm.create_or_get_logger<Logger>(
     "logger_2", std::initializer_list<std::shared_ptr<Sink>>{sink},
     PatternFormatterOptions{"[%(thread_id)] %(short_source_location:<28) "
                             "LOG_%(log_level:<9) %(logger:<12) %(message)",
                             "%H:%M:%S.%Qns", quill::Timezone::GmtTime, false},
-    ClockSourceType::Tsc, nullptr);
+    TscClock{});
 
   REQUIRE_EQ(logger_1->get_logger_name(), "logger_1");
   REQUIRE_EQ(logger_2->get_logger_name(), "logger_2");
@@ -143,7 +144,7 @@ TEST_CASE("get_valid_logger_with_exclusions")
     PatternFormatterOptions{"%(time) [%(thread_id)] %(short_source_location:<28) "
                             "LOG_%(log_level:<9) %(logger:<12) %(message)",
                             "%H:%M:%S.%Qns", quill::Timezone::GmtTime, false},
-    ClockSourceType::Tsc, nullptr);
+    TscClock{});
 
   sinks.clear();
   sinks.push_back(sink);
@@ -152,7 +153,7 @@ TEST_CASE("get_valid_logger_with_exclusions")
     PatternFormatterOptions{"%(time) [%(thread_id)] %(short_source_location:<28) "
                             "LOG_%(log_level:<9) %(logger:<12) %(message)",
                             "%H:%M:%S.%Qns", quill::Timezone::GmtTime, false},
-    ClockSourceType::Tsc, nullptr);
+    TscClock{});
 
   sinks.clear();
   sinks.push_back(sink);
@@ -161,7 +162,7 @@ TEST_CASE("get_valid_logger_with_exclusions")
     PatternFormatterOptions{"%(time) [%(thread_id)] %(short_source_location:<28) "
                             "LOG_%(log_level:<9) %(logger:<12) %(message)",
                             "%H:%M:%S.%Qns", quill::Timezone::GmtTime, false},
-    ClockSourceType::Tsc, nullptr);
+    TscClock{});
 
   sinks.clear();
   sinks.push_back(sink);
@@ -170,7 +171,7 @@ TEST_CASE("get_valid_logger_with_exclusions")
     PatternFormatterOptions{"%(time) [%(thread_id)] %(short_source_location:<28) "
                             "LOG_%(log_level:<9) %(logger:<12) %(message)",
                             "%H:%M:%S.%Qns", quill::Timezone::GmtTime, false},
-    ClockSourceType::Tsc, nullptr);
+    TscClock{});
 
   REQUIRE_EQ(lm.get_all_loggers().size(), 4);
 
@@ -297,35 +298,35 @@ TEST_CASE("parse_log_level_from_env")
 
   // no env
   REQUIRE_EQ(lm.create_or_get_logger<Logger>("lg1", std::vector<std::shared_ptr<Sink>>{},
-                                             PatternFormatterOptions{}, ClockSourceType::Tsc, nullptr)
+                                             PatternFormatterOptions{}, TscClock{})
                ->get_log_level(),
              quill::LogLevel::Info);
 
   set_env("QUILL_LOG_LEVEL", "tracel3");
   lm.parse_log_level_from_env();
   REQUIRE_EQ(lm.create_or_get_logger<Logger>("lg2", std::vector<std::shared_ptr<Sink>>{},
-                                             PatternFormatterOptions{}, ClockSourceType::Tsc, nullptr)
+                                             PatternFormatterOptions{}, TscClock{})
                ->get_log_level(),
              quill::LogLevel::TraceL3);
 
   set_env("QUILL_LOG_LEVEL", "debug");
   lm.parse_log_level_from_env();
   REQUIRE_EQ(lm.create_or_get_logger<Logger>("lg3", std::vector<std::shared_ptr<Sink>>{},
-                                             PatternFormatterOptions{}, ClockSourceType::Tsc, nullptr)
+                                             PatternFormatterOptions{}, TscClock{})
                ->get_log_level(),
              quill::LogLevel::Debug);
 
   set_env("QUILL_LOG_LEVEL", "critical");
   lm.parse_log_level_from_env();
   REQUIRE_EQ(lm.create_or_get_logger<Logger>("lg4", std::vector<std::shared_ptr<Sink>>{},
-                                             PatternFormatterOptions{}, ClockSourceType::Tsc, nullptr)
+                                             PatternFormatterOptions{}, TscClock{})
                ->get_log_level(),
              quill::LogLevel::Critical);
 
   set_env("QUILL_LOG_LEVEL", "warn");
   lm.parse_log_level_from_env();
   REQUIRE_EQ(lm.create_or_get_logger<Logger>("lg6", std::vector<std::shared_ptr<Sink>>{},
-                                             PatternFormatterOptions{}, ClockSourceType::Tsc, nullptr)
+                                             PatternFormatterOptions{}, TscClock{})
                ->get_log_level(),
              quill::LogLevel::Warning);
 
@@ -364,7 +365,7 @@ TEST_CASE("parse_log_level_from_env")
   set_env("QUILL_LOG_LEVEL", "none");
   lm.parse_log_level_from_env();
   REQUIRE_EQ(lm.create_or_get_logger<Logger>("lg5", std::vector<std::shared_ptr<Sink>>{},
-                                             PatternFormatterOptions{}, ClockSourceType::Tsc, nullptr)
+                                             PatternFormatterOptions{}, TscClock{})
                ->get_log_level(),
              quill::LogLevel::None);
 }
@@ -384,7 +385,7 @@ TEST_CASE("recreating_pending_removal_logger_throws")
     PatternFormatterOptions{"%(time) [%(thread_id)] %(short_source_location:<28) "
                             "LOG_%(log_level:<9) %(logger:<12) %(message)",
                             "%H:%M:%S.%Qns", quill::Timezone::GmtTime, false},
-    ClockSourceType::Tsc, nullptr);
+    TscClock{});
 
   lm.remove_logger(logger);
 
@@ -392,11 +393,11 @@ TEST_CASE("recreating_pending_removal_logger_throws")
   recreated_sinks.push_back(sink);
 
 #if !defined(QUILL_NO_EXCEPTIONS)
-  REQUIRE_THROWS_AS(lm.create_or_get_logger<Logger>(
-                      "logger_pending_removal", std::move(recreated_sinks),
-                      PatternFormatterOptions{"%(message)", "%H:%M:%S.%Qns", quill::Timezone::GmtTime, false},
-                      ClockSourceType::Tsc, nullptr),
-                    QuillError);
+  REQUIRE_THROWS_AS(
+    lm.create_or_get_logger<Logger>(
+      "logger_pending_removal", std::move(recreated_sinks),
+      PatternFormatterOptions{"%(message)", "%H:%M:%S.%Qns", quill::Timezone::GmtTime, false}, TscClock{}),
+    QuillError);
 #else
   (void)recreated_sinks;
 #endif
@@ -409,8 +410,7 @@ TEST_CASE("recreating_pending_removal_logger_throws")
 
   LoggerBase* recreated_logger = lm.create_or_get_logger<Logger>(
     "logger_pending_removal", std::move(sinks_after_cleanup),
-    PatternFormatterOptions{"%(message)", "%H:%M:%S.%Qns", quill::Timezone::GmtTime, false},
-    ClockSourceType::Tsc, nullptr);
+    PatternFormatterOptions{"%(message)", "%H:%M:%S.%Qns", quill::Timezone::GmtTime, false}, TscClock{});
 
   REQUIRE_NE(recreated_logger, nullptr);
   REQUIRE_EQ(recreated_logger->get_logger_name(), "logger_pending_removal");
@@ -429,11 +429,11 @@ TEST_CASE("creating_logger_with_null_sink_throws")
   sinks.emplace_back();
 
 #if !defined(QUILL_NO_EXCEPTIONS)
-  REQUIRE_THROWS_AS(lm.create_or_get_logger<Logger>(
-                      "logger_with_null_sink", std::move(sinks),
-                      PatternFormatterOptions{"%(message)", "%H:%M:%S.%Qns", quill::Timezone::GmtTime, false},
-                      ClockSourceType::Tsc, nullptr),
-                    QuillError);
+  REQUIRE_THROWS_AS(
+    lm.create_or_get_logger<Logger>(
+      "logger_with_null_sink", std::move(sinks),
+      PatternFormatterOptions{"%(message)", "%H:%M:%S.%Qns", quill::Timezone::GmtTime, false}, TscClock{}),
+    QuillError);
 #else
   (void)lm;
   (void)sinks;
@@ -451,8 +451,7 @@ TEST_CASE("create_logger_succeeds_and_rejects_duplicate")
 
   LoggerBase* logger = lm.create_logger<Logger>(
     "create_logger_test", std::move(sinks),
-    PatternFormatterOptions{"%(message)", "%H:%M:%S.%Qns", quill::Timezone::GmtTime, false},
-    ClockSourceType::Tsc, nullptr);
+    PatternFormatterOptions{"%(message)", "%H:%M:%S.%Qns", quill::Timezone::GmtTime, false}, TscClock{});
 
   REQUIRE_NE(logger, nullptr);
   REQUIRE_EQ(logger->get_logger_name(), "create_logger_test");
@@ -462,11 +461,11 @@ TEST_CASE("create_logger_succeeds_and_rejects_duplicate")
   sinks2.push_back(sink);
 
 #if !defined(QUILL_NO_EXCEPTIONS)
-  REQUIRE_THROWS_AS(lm.create_logger<Logger>("create_logger_test", std::move(sinks2),
-                                             PatternFormatterOptions{"%(message)", "%H:%M:%S.%Qns",
-                                                                     quill::Timezone::GmtTime, false},
-                                             ClockSourceType::Tsc, nullptr),
-                    QuillError);
+  REQUIRE_THROWS_AS(
+    lm.create_logger<Logger>(
+      "create_logger_test", std::move(sinks2),
+      PatternFormatterOptions{"%(message)", "%H:%M:%S.%Qns", quill::Timezone::GmtTime, false}, TscClock{}),
+    QuillError);
 #else
   (void)sinks2;
 #endif
@@ -477,8 +476,7 @@ TEST_CASE("create_logger_succeeds_and_rejects_duplicate")
 
   LoggerBase* same_logger = lm.create_or_get_logger<Logger>(
     "create_logger_test", std::move(sinks3),
-    PatternFormatterOptions{"%(message)", "%H:%M:%S.%Qns", quill::Timezone::GmtTime, false},
-    ClockSourceType::Tsc, nullptr);
+    PatternFormatterOptions{"%(message)", "%H:%M:%S.%Qns", quill::Timezone::GmtTime, false}, TscClock{});
 
   REQUIRE_EQ(logger, same_logger);
 

@@ -17,10 +17,10 @@ using namespace quill;
 
 namespace
 {
-class TestUserClockSource : public UserClockSource
+class TestSimulationClock
 {
 public:
-  uint64_t now() const override { return _timestamp.load(std::memory_order_relaxed); }
+  uint64_t now() const { return _timestamp.load(std::memory_order_relaxed); }
 
   void set_timestamp(std::chrono::nanoseconds timestamp)
   {
@@ -31,8 +31,8 @@ private:
   std::atomic<uint64_t> _timestamp{0};
 };
 
-Logger* create_user_clock_file_logger(std::string const& logger_name, char const* filename,
-                                      TestUserClockSource& user_clock)
+auto* create_user_clock_file_logger(std::string const& logger_name, char const* filename,
+                                    TestSimulationClock& user_clock)
 {
   auto file_sink = Frontend::create_or_get_sink<FileSink>(
     filename,
@@ -47,7 +47,7 @@ Logger* create_user_clock_file_logger(std::string const& logger_name, char const
   return Frontend::create_or_get_logger(
     logger_name, std::move(file_sink),
     PatternFormatterOptions{"%(time) %(log_level) %(message)", "%Y-%m-%d %H:%M:%S.%Qns", Timezone::GmtTime, false},
-    ClockSourceType::User, &user_clock);
+    &user_clock);
 }
 } // namespace
 
@@ -58,8 +58,8 @@ TEST_CASE("monotonic_output_timestamps_disabled_by_default")
 
   Backend::start();
 
-  TestUserClockSource user_clock;
-  Logger* logger = create_user_clock_file_logger(logger_name, filename, user_clock);
+  TestSimulationClock user_clock;
+  auto* logger = create_user_clock_file_logger(logger_name, filename, user_clock);
 
   user_clock.set_timestamp(std::chrono::seconds{2});
   LOG_INFO(logger, "first");
@@ -67,6 +67,7 @@ TEST_CASE("monotonic_output_timestamps_disabled_by_default")
   user_clock.set_timestamp(std::chrono::seconds{1});
   LOG_INFO(logger, "second");
 
+  Frontend::remove_logger_blocking(logger);
   Backend::stop();
 
   std::vector<std::string> const file_contents = quill::testing::file_contents(filename);

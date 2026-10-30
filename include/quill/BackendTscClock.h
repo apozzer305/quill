@@ -28,7 +28,7 @@ QUILL_BEGIN_EXPORT
  * Other threads can obtain timestamps synchronized with the TSC clock of the backend logging
  * thread, ensuring synchronization with log statement timestamps.
  *
- * If `ClockSourceType::Tsc` is not used by any Logger, this class reverts to using the system clock
+ * If `TscClock` is not used by any Logger, this class reverts to using the system clock
  * for providing a timestamp.
  *
  * @note For more accurate timestamps, consider reducing `rdtsc_resync_interval` in `BackendOptions`.

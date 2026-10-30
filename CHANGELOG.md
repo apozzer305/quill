@@ -106,6 +106,9 @@
 
 ## Unreleased
 
+- Logger clocks are now selected at compile time using `TscClock`, `SystemClock`, or a concrete
+  custom clock object/pointer. System and custom clocks use the inline logging path without virtual clock dispatch;
+  replace clock enum arguments and `UserClockSource` inheritance with the new clock API.
 - On macOS, `%(thread_name)` now shows thread names longer than 15 characters in full instead of
   only their first 15 characters.
 

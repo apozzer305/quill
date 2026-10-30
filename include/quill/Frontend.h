@@ -7,7 +7,6 @@
 #pragma once
 
 #include "quill/Logger.h"
-#include "quill/UserClockSource.h"
 #include "quill/core/Attributes.h"
 #include "quill/core/Common.h"
 #include "quill/core/FrontendOptions.h"
@@ -211,23 +210,25 @@ public:
    * @param logger_name The name of the logger.
    * @param sink A shared pointer to the sink to associate with the logger.
    * @param pattern_formatter_options Contains the formatting configuration for PatternFormatter
-   * @param clock_source The clock source for log timestamps.
-   * @param user_clock A pointer to a custom user clock.
+   * @param clock A clock object or a non-owned pointer to a custom clock with now() const.
+   *        Custom clocks return nanoseconds since epoch and must be thread-safe when shared.
    *
    * @return Logger* A pointer to the created logger.
    * @throws QuillError if a logger with the same name already exists or is pending removal.
    */
-  static logger_t* create_logger(std::string const& logger_name, std::shared_ptr<Sink> sink,
-                                 PatternFormatterOptions const& pattern_formatter_options = PatternFormatterOptions{},
-                                 ClockSourceType clock_source = ClockSourceType::Tsc,
-                                 UserClockSource* user_clock = nullptr)
+  template <typename TClock = TscClock>
+  static LoggerImpl<frontend_options_t, TClock>* create_logger(
+    std::string const& logger_name, std::shared_ptr<Sink> sink,
+    PatternFormatterOptions const& pattern_formatter_options = PatternFormatterOptions{},
+    TClock clock = TClock{})
   {
     std::vector<std::shared_ptr<Sink>> sinks;
     sinks.push_back(static_cast<std::shared_ptr<Sink>&&>(sink));
 
-    return _cast_to_logger(detail::LoggerManager::instance().create_logger<logger_t>(
-      logger_name, static_cast<std::vector<std::shared_ptr<Sink>>&&>(sinks),
-      pattern_formatter_options, clock_source, user_clock));
+    return _cast_to_logger<TClock>(
+      detail::LoggerManager::instance().create_logger<LoggerImpl<frontend_options_t, TClock>>(
+        logger_name, static_cast<std::vector<std::shared_ptr<Sink>>&&>(sinks),
+        pattern_formatter_options, static_cast<TClock&&>(clock)));
   }
 
   /**
@@ -236,19 +237,21 @@ public:
    * @param logger_name The name of the logger.
    * @param sinks A vector of shared pointers to sinks to associate with the logger.
    * @param pattern_formatter_options Contains the formatting configuration for PatternFormatter
-   * @param clock_source The clock source for log timestamps.
-   * @param user_clock A pointer to a custom user clock.
+   * @param clock A clock object or a non-owned pointer to a custom clock with now() const.
+   *        Custom clocks return nanoseconds since epoch and must be thread-safe when shared.
    * @return Logger* A pointer to the created logger.
    * @throws QuillError if a logger with the same name already exists or is pending removal.
    */
-  static logger_t* create_logger(std::string const& logger_name, std::vector<std::shared_ptr<Sink>> sinks,
-                                 PatternFormatterOptions const& pattern_formatter_options = PatternFormatterOptions{},
-                                 ClockSourceType clock_source = ClockSourceType::Tsc,
-                                 UserClockSource* user_clock = nullptr)
+  template <typename TClock = TscClock>
+  static LoggerImpl<frontend_options_t, TClock>* create_logger(
+    std::string const& logger_name, std::vector<std::shared_ptr<Sink>> sinks,
+    PatternFormatterOptions const& pattern_formatter_options = PatternFormatterOptions{},
+    TClock clock = TClock{})
   {
-    return _cast_to_logger(detail::LoggerManager::instance().create_logger<logger_t>(
-      logger_name, static_cast<std::vector<std::shared_ptr<Sink>>&&>(sinks),
-      pattern_formatter_options, clock_source, user_clock));
+    return _cast_to_logger<TClock>(
+      detail::LoggerManager::instance().create_logger<LoggerImpl<frontend_options_t, TClock>>(
+        logger_name, static_cast<std::vector<std::shared_ptr<Sink>>&&>(sinks),
+        pattern_formatter_options, static_cast<TClock&&>(clock)));
   }
 
   /**
@@ -257,19 +260,19 @@ public:
    * @param logger_name The name of the logger.
    * @param sinks An initializer list of shared pointers to sinks to associate with the logger.
    * @param pattern_formatter_options Contains the formatting configuration for PatternFormatter
-   * @param clock_source The clock source for log timestamps.
-   * @param user_clock A pointer to a custom user clock.
+   * @param clock A clock object or a non-owned pointer to a custom clock with now() const.
+   *        Custom clocks return nanoseconds since epoch and must be thread-safe when shared.
    * @return Logger* A pointer to the created logger.
    * @throws QuillError if a logger with the same name already exists or is pending removal.
    */
-  static logger_t* create_logger(std::string const& logger_name,
-                                 std::initializer_list<std::shared_ptr<Sink>> sinks,
-                                 PatternFormatterOptions const& pattern_formatter_options = PatternFormatterOptions{},
-                                 ClockSourceType clock_source = ClockSourceType::Tsc,
-                                 UserClockSource* user_clock = nullptr)
+  template <typename TClock = TscClock>
+  static LoggerImpl<frontend_options_t, TClock>* create_logger(
+    std::string const& logger_name, std::initializer_list<std::shared_ptr<Sink>> sinks,
+    PatternFormatterOptions const& pattern_formatter_options = PatternFormatterOptions{},
+    TClock clock = TClock{})
   {
     return create_logger(logger_name, std::vector<std::shared_ptr<Sink>>{sinks},
-                         pattern_formatter_options, clock_source, user_clock);
+                         pattern_formatter_options, static_cast<TClock&&>(clock));
   }
 
   /**
@@ -278,28 +281,30 @@ public:
    * @param logger_name The name of the logger.
    * @param sink A shared pointer to the sink to associate with the logger.
    * @param pattern_formatter_options Contains the formatting configuration for PatternFormatter
-   * @param clock_source The clock source for log timestamps.
-   * @param user_clock A pointer to a custom user clock.
+   * @param clock A clock object or a non-owned pointer to a custom clock with now() const.
+   *        Custom clocks return nanoseconds since epoch and must be thread-safe when shared.
    *
    * @note If a logger with the specified name already exists, the existing logger is returned
-   *       and the provided sinks, pattern, clock source, and user clock parameters are ignored.
+   *       and the provided sinks, pattern and clock parameters are ignored. The clock type must match.
    * @note Recreating a logger with the same name while a previous logger is still pending
    *       asynchronous removal will throw `QuillError`. Use remove_logger_blocking() when you
    *       need synchronous removal before recreating a logger.
    *
    * @return Logger* A pointer to the created or retrieved logger.
    */
-  static logger_t* create_or_get_logger(std::string const& logger_name, std::shared_ptr<Sink> sink,
-                                        PatternFormatterOptions const& pattern_formatter_options = PatternFormatterOptions{},
-                                        ClockSourceType clock_source = ClockSourceType::Tsc,
-                                        UserClockSource* user_clock = nullptr)
+  template <typename TClock = TscClock>
+  static LoggerImpl<frontend_options_t, TClock>* create_or_get_logger(
+    std::string const& logger_name, std::shared_ptr<Sink> sink,
+    PatternFormatterOptions const& pattern_formatter_options = PatternFormatterOptions{},
+    TClock clock = TClock{})
   {
     std::vector<std::shared_ptr<Sink>> sinks;
     sinks.push_back(static_cast<std::shared_ptr<Sink>&&>(sink));
 
-    return _cast_to_logger(detail::LoggerManager::instance().create_or_get_logger<logger_t>(
-      logger_name, static_cast<std::vector<std::shared_ptr<Sink>>&&>(sinks),
-      pattern_formatter_options, clock_source, user_clock));
+    return _cast_to_logger<TClock>(
+      detail::LoggerManager::instance().create_or_get_logger<LoggerImpl<frontend_options_t, TClock>>(
+        logger_name, static_cast<std::vector<std::shared_ptr<Sink>>&&>(sinks),
+        pattern_formatter_options, static_cast<TClock&&>(clock)));
   }
 
   /**
@@ -308,23 +313,25 @@ public:
    * @param logger_name The name of the logger.
    * @param sinks A vector of shared pointers to sinks to associate with the logger.
    * @param pattern_formatter_options Contains the formatting configuration for PatternFormatter
-   * @param clock_source The clock source for log timestamps.
-   * @param user_clock A pointer to a custom user clock.
+   * @param clock A clock object or a non-owned pointer to a custom clock with now() const.
+   *        Custom clocks return nanoseconds since epoch and must be thread-safe when shared.
    * @note If a logger with the specified name already exists, the existing logger is returned
-   *       and the provided sinks, pattern, clock source, and user clock parameters are ignored.
+   *       and the provided sinks, pattern and clock parameters are ignored. The clock type must match.
    * @note Recreating a logger with the same name while a previous logger is still pending
    *       asynchronous removal will throw `QuillError`. Use remove_logger_blocking() when you
    *       need synchronous removal before recreating a logger.
    * @return Logger* A pointer to the created or retrieved logger.
    */
-  static logger_t* create_or_get_logger(
+  template <typename TClock = TscClock>
+  static LoggerImpl<frontend_options_t, TClock>* create_or_get_logger(
     std::string const& logger_name, std::vector<std::shared_ptr<Sink>> sinks,
     PatternFormatterOptions const& pattern_formatter_options = PatternFormatterOptions{},
-    ClockSourceType clock_source = ClockSourceType::Tsc, UserClockSource* user_clock = nullptr)
+    TClock clock = TClock{})
   {
-    return _cast_to_logger(detail::LoggerManager::instance().create_or_get_logger<logger_t>(
-      logger_name, static_cast<std::vector<std::shared_ptr<Sink>>&&>(sinks),
-      pattern_formatter_options, clock_source, user_clock));
+    return _cast_to_logger<TClock>(
+      detail::LoggerManager::instance().create_or_get_logger<LoggerImpl<frontend_options_t, TClock>>(
+        logger_name, static_cast<std::vector<std::shared_ptr<Sink>>&&>(sinks),
+        pattern_formatter_options, static_cast<TClock&&>(clock)));
   }
 
   /**
@@ -333,22 +340,23 @@ public:
    * @param logger_name The name of the logger.
    * @param sinks An initializer list of shared pointers to sinks to associate with the logger.
    * @param pattern_formatter_options Contains the formatting configuration for PatternFormatter
-   * @param clock_source The clock source for log timestamps.
-   * @param user_clock A pointer to a custom user clock.
+   * @param clock A clock object or a non-owned pointer to a custom clock with now() const.
+   *        Custom clocks return nanoseconds since epoch and must be thread-safe when shared.
    * @note If a logger with the specified name already exists, the existing logger is returned
-   *       and the provided sinks, pattern, clock source, and user clock parameters are ignored.
+   *       and the provided sinks, pattern and clock parameters are ignored. The clock type must match.
    * @note Recreating a logger with the same name while a previous logger is still pending
    *       asynchronous removal will throw `QuillError`. Use remove_logger_blocking() when you
    *       need synchronous removal before recreating a logger.
    * @return Logger* A pointer to the created or retrieved logger.
    */
-  static logger_t* create_or_get_logger(
+  template <typename TClock = TscClock>
+  static LoggerImpl<frontend_options_t, TClock>* create_or_get_logger(
     std::string const& logger_name, std::initializer_list<std::shared_ptr<Sink>> sinks,
     PatternFormatterOptions const& pattern_formatter_options = PatternFormatterOptions{},
-    ClockSourceType clock_source = ClockSourceType::Tsc, UserClockSource* user_clock = nullptr)
+    TClock clock = TClock{})
   {
     return create_or_get_logger(logger_name, std::vector<std::shared_ptr<Sink>>{sinks},
-                                pattern_formatter_options, clock_source, user_clock);
+                                pattern_formatter_options, static_cast<TClock&&>(clock));
   }
 
   /**
@@ -357,6 +365,8 @@ public:
    * This function allows you to create or obtain a logger identified by `logger_name`. If a logger with the
    * same name already exists, its configuration options will be used. If it does not exist, a new logger
    * will be created with the same options as the provided `source_logger`.
+   * The clock object or pointer is copied. A new logger with a move-only clock must be
+   * created with an explicit clock argument instead.
    *
    * @param logger_name The name of the logger to create or retrieve.
    * @param source_logger The logger from which to copy the configuration options.
@@ -365,10 +375,13 @@ public:
    *       need synchronous removal before recreating a logger.
    * @return A pointer to the logger instance, either newly created or retrieved.
    */
-  static logger_t* create_or_get_logger(std::string const& logger_name, detail::LoggerBase* source_logger = nullptr)
+  template <typename TClock = TscClock>
+  static LoggerImpl<frontend_options_t, TClock>* create_or_get_logger(
+    std::string const& logger_name, LoggerImpl<frontend_options_t, TClock>* source_logger = nullptr)
   {
     detail::LoggerBase* logger_base =
-      detail::LoggerManager::instance().create_or_get_logger<logger_t>(logger_name, source_logger);
+      detail::LoggerManager::instance().create_or_get_logger<LoggerImpl<frontend_options_t, TClock>>(
+        logger_name, source_logger);
 
     if (QUILL_UNLIKELY(!logger_base))
     {
@@ -377,7 +390,7 @@ public:
         "the logger does not already exist"});
     }
 
-    return _cast_to_logger(logger_base);
+    return _cast_to_logger<TClock>(logger_base);
   }
 
   /**
@@ -423,7 +436,9 @@ public:
    * @param logger A pointer to the logger to remove.
    * @param sleep_duration_ns The duration in nanoseconds to sleep between retries
    */
-  static void remove_logger_blocking(logger_t* logger, uint32_t sleep_duration_ns = 100)
+  template <typename TClock>
+  static void remove_logger_blocking(LoggerImpl<frontend_options_t, TClock>* logger,
+                                     uint32_t sleep_duration_ns = 100)
   {
     if (!logger)
     {
@@ -472,53 +487,74 @@ public:
     }
   }
 
+  /** No-op overload for a null logger. */
+  static void remove_logger_blocking(std::nullptr_t, uint32_t = 100) noexcept {}
+
   /**
    * @brief Retrieves an existing logger with the specified name.
    *
    * @param logger_name The name of the logger.
    * @return Logger* A pointer to the retrieved logger, or nullptr if not found.
+   * @tparam TClock The clock type used at creation, defaulting to TscClock.
+   * @throws QuillError if an existing logger has incompatible clock or frontend option types.
    *
    * @note Returns nullptr on miss on purpose so callers can check for a removed logger
    *       without catching an exception (e.g., after the async remove_logger() path).
    *       get_sink() and get_metric() are stricter and throw — they have no comparable
    *       use case for an expected miss.
    */
-  QUILL_NODISCARD static logger_t* get_logger(std::string const& logger_name)
+  template <typename TClock = TscClock>
+  QUILL_NODISCARD static LoggerImpl<frontend_options_t, TClock>* get_logger(std::string const& logger_name)
   {
     detail::LoggerBase* logger = detail::LoggerManager::instance().get_logger(logger_name);
-    return logger ? _cast_to_logger(logger) : nullptr;
+    return logger ? _cast_to_logger<TClock>(logger) : nullptr;
   }
 
   /**
-   * @brief Retrieves a map of all registered valid loggers.
+   * @brief Retrieves all valid loggers with the requested clock type.
    * @note If `remove_logger()` is called from this or another thread, the return value
    *       of this function will become invalid.
-   * @return A vector containing all registered loggers.
+   * @return A vector containing loggers with the requested clock type and frontend options.
    */
-  QUILL_NODISCARD static std::vector<logger_t*> get_all_loggers()
+  template <typename TClock = TscClock>
+  QUILL_NODISCARD static std::vector<LoggerImpl<frontend_options_t, TClock>*> get_all_loggers()
   {
     std::vector<detail::LoggerBase*> logger_bases = detail::LoggerManager::instance().get_all_loggers();
 
-    std::vector<logger_t*> loggers;
+    std::vector<LoggerImpl<frontend_options_t, TClock>*> loggers;
 
     for (auto const& logger_base : logger_bases)
     {
-      loggers.push_back(_cast_to_logger(logger_base));
+      if (_is_logger_type<TClock>(logger_base))
+      {
+        loggers.push_back(static_cast<LoggerImpl<frontend_options_t, TClock>*>(logger_base));
+      }
     }
 
     return loggers;
   }
 
   /**
-   * Returns the first valid logger that is found. This is useful when you do not want to use the
-   * std::vector<logger_t*> return value of get_all_loggers.
+   * Returns the first valid logger with the requested clock type and frontend options. This is
+   * useful when you do not want to use the std::vector<logger_t*> return value of get_all_loggers.
    *
    * @return A pointer to the first valid logger, or nullptr if no valid logger is found.
    */
-  QUILL_NODISCARD static logger_t* get_valid_logger() noexcept
+  template <typename TClock = TscClock>
+  QUILL_NODISCARD static LoggerImpl<frontend_options_t, TClock>* get_valid_logger() noexcept
   {
-    detail::LoggerBase* logger = detail::LoggerManager::instance().get_valid_logger();
-    return logger ? _cast_to_logger(logger) : nullptr;
+    LoggerImpl<frontend_options_t, TClock>* logger{nullptr};
+    detail::LoggerManager::instance().for_each_logger(
+      [&logger](detail::LoggerBase* candidate)
+      {
+        if (candidate->is_valid_logger() && _is_logger_type<TClock>(candidate))
+        {
+          logger = static_cast<LoggerImpl<frontend_options_t, TClock>*>(candidate);
+          return true;
+        }
+        return false;
+      });
+    return logger;
   }
 
   /**
@@ -533,26 +569,39 @@ public:
   }
 
 private:
-  QUILL_NODISCARD static logger_t* _cast_to_logger(detail::LoggerBase* logger_base)
+  template <typename TClock>
+  QUILL_NODISCARD static bool _is_logger_type(detail::LoggerBase* logger_base) noexcept
   {
-    QUILL_ASSERT(logger_base, "logger_base is nullptr in Frontend::_cast_to_logger()");
-
 #if QUILL_USE_RTTI
-    // MSVC may warn that a variable with the same name is hidden by this declaration,
-    // so the variable is prefixed with an underscore ('_') to avoid shadowing.
-    auto* _logger_cast = dynamic_cast<logger_t*>(logger_base);
+    return dynamic_cast<LoggerImpl<frontend_options_t, TClock>*>(logger_base) != nullptr;
+#else
+    auto const* actual = logger_base->get_frontend_functions();
+    auto const* expected = LoggerImpl<frontend_options_t, TClock>::frontend_functions();
+    if (actual == expected)
+    {
+      return true;
+    }
 
-    if (QUILL_UNLIKELY(!_logger_cast))
+    // Hidden template instantiations can have separate tables across shared libraries.
+    // Compare compiler signatures for named types, but keep translation-unit-local types
+    // distinct even when their printed names happen to match.
+    std::string_view const name = expected->type_name;
+    return name == actual->type_name && name.find("{anonymous}") == std::string_view::npos &&
+      name.find("anonymous namespace") == std::string_view::npos &&
+      name.find("<unnamed") == std::string_view::npos && name.find("<lambda") == std::string_view::npos &&
+      name.find("(lambda at") == std::string_view::npos && name.find('`') == std::string_view::npos &&
+      name.find(")::") == std::string_view::npos;
+#endif
+  }
+
+  template <typename TClock>
+  QUILL_NODISCARD static LoggerImpl<frontend_options_t, TClock>* _cast_to_logger(detail::LoggerBase* logger_base)
+  {
+    if (QUILL_UNLIKELY(!_is_logger_type<TClock>(logger_base)))
     {
       QUILL_THROW(QuillError{"Failed to cast logger. Invalid logger type."});
     }
-#else
-    // MSVC may warn that a variable with the same name is hidden by this declaration,
-    // so the variable is prefixed with an underscore ('_') to avoid shadowing.
-    auto* _logger_cast = static_cast<logger_t*>(logger_base);
-#endif
-
-    return _logger_cast;
+    return static_cast<LoggerImpl<frontend_options_t, TClock>*>(logger_base);
   }
 };
 

@@ -23,6 +23,7 @@
   #include <optional>
   #include <string>
   #include <string_view>
+  #include <type_traits>
   #include <vector>
 #endif
 
@@ -32,7 +33,6 @@ QUILL_BEGIN_NAMESPACE
 QUILL_BEGIN_EXPORT
 
 class Sink;
-class UserClockSource;
 
 QUILL_END_EXPORT
 
@@ -174,7 +174,7 @@ public:
   template <typename TLogger>
   LoggerBase* create_logger(std::string const& logger_name, std::vector<std::shared_ptr<Sink>> sinks,
                             PatternFormatterOptions const& pattern_formatter_options,
-                            ClockSourceType clock_source, UserClockSource* user_clock)
+                            typename TLogger::clock_t clock)
   {
     QUILL_TRY
     {
@@ -202,7 +202,7 @@ public:
 
       std::unique_ptr<LoggerBase> new_logger{
         new TLogger{logger_name, static_cast<std::vector<std::shared_ptr<Sink>>&&>(sinks),
-                    pattern_formatter_options, clock_source, user_clock}};
+                    pattern_formatter_options, static_cast<typename TLogger::clock_t&&>(clock)}};
 
       _insert_logger(static_cast<std::unique_ptr<LoggerBase>&&>(new_logger));
 
@@ -230,12 +230,12 @@ public:
   /**
    * @brief Creates a new logger or returns an existing one with the given name.
    * @note If a logger with the specified name already exists, the existing logger is returned
-   * and the provided sinks, pattern, clock source, and user clock parameters are ignored.
+   * and the provided sinks, pattern and clock parameters are ignored.
    */
   template <typename TLogger>
   LoggerBase* create_or_get_logger(std::string const& logger_name, std::vector<std::shared_ptr<Sink>> sinks,
                                    PatternFormatterOptions const& pattern_formatter_options,
-                                   ClockSourceType clock_source, UserClockSource* user_clock)
+                                   typename TLogger::clock_t clock)
   {
     QUILL_TRY
     {
@@ -257,7 +257,7 @@ public:
         // If logger pointer is null, create a new logger instance.
         std::unique_ptr<LoggerBase> new_logger{
           new TLogger{logger_name, static_cast<std::vector<std::shared_ptr<Sink>>&&>(sinks),
-                      pattern_formatter_options, clock_source, user_clock}};
+                      pattern_formatter_options, static_cast<typename TLogger::clock_t&&>(clock)}};
 
         _insert_logger(static_cast<std::unique_ptr<LoggerBase>&&>(new_logger));
 
@@ -288,15 +288,29 @@ public:
 
   /***/
   template <typename TLogger>
-  LoggerBase* create_or_get_logger(std::string const& logger_name, LoggerBase* source_logger)
+  LoggerBase* create_or_get_logger(std::string const& logger_name, TLogger* source_logger)
   {
     if (!source_logger)
     {
       return get_logger(logger_name);
     }
 
-    return create_or_get_logger<TLogger>(logger_name, source_logger->_sinks, source_logger->_pattern_formatter_options,
-                                         source_logger->_clock_source, source_logger->_user_clock);
+    if constexpr (std::is_copy_constructible_v<typename TLogger::clock_t>)
+    {
+      return create_or_get_logger<TLogger>(logger_name, source_logger->_sinks, source_logger->_pattern_formatter_options,
+                                           source_logger->get_clock());
+    }
+    else
+    {
+      LoggerBase* existing = get_logger(logger_name);
+      if (existing)
+      {
+        return existing;
+      }
+      QUILL_THROW(
+        QuillError{"Cloning a logger requires a copyable clock. Create the logger with an explicit "
+                   "clock instead."});
+    }
   }
 
   /***/

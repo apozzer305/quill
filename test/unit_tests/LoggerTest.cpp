@@ -1,6 +1,7 @@
 #include "doctest/doctest.h"
 
 #include "quill/Logger.h"
+#include "quill/backend/ThreadUtilities.h"
 #include "quill/core/LoggerManager.h"
 
 #include "quill/sinks/ConsoleSink.h"
@@ -25,7 +26,7 @@ TEST_CASE("check_logger")
     PatternFormatterOptions{"%(time) [%(thread_id)] %(short_source_location:<28) "
                             "LOG_%(log_level:<9) %(logger:<12) %(message)",
                             "%H:%M:%S.%Qns", quill::Timezone::GmtTime, false},
-    ClockSourceType::Tsc, nullptr));
+    TscClock{}));
 
   // Check default log level
   REQUIRE_EQ(logger_1->get_log_level(), LogLevel::Info);
@@ -37,7 +38,6 @@ TEST_CASE("check_logger")
   REQUIRE_EQ(logger_1->get_pattern_formatter_options().timestamp_pattern, "%H:%M:%S.%Qns");
   REQUIRE_EQ(logger_1->get_pattern_formatter_options().timestamp_timezone, quill::Timezone::GmtTime);
   REQUIRE_EQ(logger_1->get_clock_source_type(), ClockSourceType::Tsc);
-  REQUIRE_EQ(logger_1->get_user_clock_source(), nullptr);
   REQUIRE_EQ(logger_1->get_sinks().size(), 1);
   REQUIRE_EQ(logger_1->get_sinks().front().get(), sink.get());
 
@@ -62,7 +62,7 @@ TEST_CASE("logger_should_log")
     PatternFormatterOptions{"%(time) [%(thread_id)] %(short_source_location:<28) "
                             "LOG_%(log_level:<9) %(logger:<12) %(message)",
                             "%H:%M:%S.%Qns", quill::Timezone::GmtTime, false},
-    ClockSourceType::Tsc, nullptr));
+    TscClock{}));
 
   REQUIRE_UNARY_FALSE(logger_1->should_log_statement<LogLevel::Debug>());
   REQUIRE(logger_1->should_log_statement<LogLevel::Info>());

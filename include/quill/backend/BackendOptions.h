@@ -274,7 +274,7 @@ struct BackendOptions
 
   /**
    * This option is only applicable if at least one frontend is using a Logger with
-   * ClockSourceType::Tsc
+   * TscClock
    *
    * When the system clock is used, this option can be ignored.
    *

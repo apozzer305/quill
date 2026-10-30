@@ -42,17 +42,18 @@ TEST_CASE("signal_handler_logger")
   quill::init_signal_handler<quill::FrontendOptions>();
 #endif
 
-  Logger* logger_a = Frontend::create_or_get_logger(logger_name_a,
-                                                    Frontend::create_or_get_sink<FileSink>(
-                                                      filename_a,
-                                                      []()
-                                                      {
-                                                        FileSinkConfig cfg;
-                                                        cfg.set_open_mode('w');
-                                                        cfg.set_fsync_enabled(true);
-                                                        return cfg;
-                                                      }(),
-                                                      FileEventNotifier{}));
+  auto* logger_a = Frontend::create_or_get_logger(logger_name_a,
+                                                  Frontend::create_or_get_sink<FileSink>(
+                                                    filename_a,
+                                                    []()
+                                                    {
+                                                      FileSinkConfig cfg;
+                                                      cfg.set_open_mode('w');
+                                                      cfg.set_fsync_enabled(true);
+                                                      return cfg;
+                                                    }(),
+                                                    FileEventNotifier{}),
+                                                  PatternFormatterOptions{}, SystemClock{});
 
   // Create the logger for the signal handler to find it
   Frontend::create_or_get_logger(logger_name_b,
@@ -65,7 +66,8 @@ TEST_CASE("signal_handler_logger")
                                      cfg.set_fsync_enabled(true);
                                      return cfg;
                                    }(),
-                                   FileEventNotifier{}));
+                                   FileEventNotifier{}),
+                                 PatternFormatterOptions{}, SystemClock{});
 
   for (size_t i = 0; i < number_of_messages; ++i)
   {
@@ -87,7 +89,7 @@ TEST_CASE("signal_handler_logger")
   }
 
   // Wait until the backend thread stops for test stability
-  for (Logger* logger : Frontend::get_all_loggers())
+  for (auto* logger : Frontend::get_all_loggers<SystemClock>())
   {
     logger->flush_log();
     Frontend::remove_logger(logger);

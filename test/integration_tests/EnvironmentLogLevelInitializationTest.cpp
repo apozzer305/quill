@@ -2,6 +2,7 @@
 
 #include "quill/Frontend.h"
 #include "quill/Logger.h"
+#include "quill/backend/ThreadUtilities.h"
 #include "quill/core/QuillError.h"
 #include "quill/sinks/ConsoleSink.h"
 

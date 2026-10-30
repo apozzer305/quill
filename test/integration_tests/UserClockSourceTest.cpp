@@ -15,16 +15,16 @@ using namespace quill;
 /**
  * Custom timestamp class
  */
-class UserClockSourceTest : public UserClockSource
+class TestSimulationClock
 {
 public:
-  UserClockSourceTest() = default;
+  TestSimulationClock() = default;
 
   /**
    * Required by TimestampClock
    * @return current time now, in nanoseconds since epoch
    */
-  uint64_t now() const override { return _ts.load(); }
+  uint64_t now() const { return _ts.load(); }
 
   /**
    * set custom timestamp
@@ -54,7 +54,7 @@ TEST_CASE("user_clock_source")
   // Start the logging backend thread
   Backend::start();
 
-  UserClockSourceTest uct;
+  TestSimulationClock uct;
   uct.set_timestamp(std::chrono::seconds{1655007309});
 
   // Set writing logging to a file
@@ -68,12 +68,12 @@ TEST_CASE("user_clock_source")
     }(),
     FileEventNotifier{});
 
-  Logger* logger = Frontend::create_or_get_logger(
+  auto* logger = Frontend::create_or_get_logger(
     logger_name, std::move(file_sink),
     PatternFormatterOptions{"%(time) %(log_level) %(logger:<16) %(message)", // format
                             "%Y-%m-%d %H:%M:%S.%Qms",                        // timestamp format
                             quill::Timezone::GmtTime, false},
-    ClockSourceType::User, &uct);
+    &uct);
 
   for (size_t i = 0; i < number_of_messages; ++i)
   {
