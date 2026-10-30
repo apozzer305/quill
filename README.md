@@ -234,6 +234,32 @@ logger->publish_metric(requests_total, 1.0);
 See the [Metrics guide](https://quillcpp.readthedocs.io/en/latest/metrics.html) for sink setup, custom sinks, and
 Prometheus integration.
 
+### Clock migration
+
+Custom clocks no longer inherit from `quill::UserClockSource`: remove its header include, base class and
+`virtual`/`override` specifiers, keeping your existing `now()` implementation. Pass the clock pointer without the
+`ClockSourceType::User` argument:
+
+```c++
+#include <atomic>
+#include <cstdint>
+
+struct SimClock
+{
+  uint64_t now() const { return timestamp_ns.load(std::memory_order_relaxed); }
+  std::atomic<uint64_t> timestamp_ns{0}; // Nanoseconds since epoch.
+};
+
+SimClock sim_clock;
+auto* logger = quill::Frontend::create_or_get_logger(
+  "simulation", sink, quill::PatternFormatterOptions{}, &sim_clock);
+```
+
+Use `auto*` for the logger and `quill::Frontend::get_logger<SimClock*>("simulation")` for lookups.
+Keep the clock alive until logger removal.
+System-clock callers replace the old enum argument with `quill::SystemClock{}`; default TSC usage is unchanged.
+See the [full custom-clock example](examples/user_clock_source.cpp).
+
 ---
 
 ## 🎯 Features

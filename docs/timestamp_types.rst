@@ -52,6 +52,10 @@ cost of ``std::chrono::system_clock::now()``. Queue initialization, growth, bloc
 use a cold fallback only when needed. Selecting a System or custom clock does not force
 logging onto that fallback.
 
+``ClockSourceType`` and ``get_clock_source_type()`` remain available for introspection.
+The backend uses this classification for timestamp conversion and ordering; frontend clock
+selection is resolved at compile time.
+
 The clock type is part of ``LoggerImpl<TFrontendOptions, TClock>``. Use ``auto*`` for the returned
 logger, or an alias for its concrete type. ``quill::Logger`` remains the default TSC logger.
 Loggers with different clock types may coexist and share the same frontend queues; use the

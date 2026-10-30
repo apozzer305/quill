@@ -8,7 +8,6 @@
 
 #include "quill/ClockSource.h"
 #include "quill/core/Attributes.h"
-#include "quill/core/ChronoTimeUtils.h"
 #include "quill/core/Codec.h"
 #include "quill/core/Common.h"
 #include "quill/core/FrontendOptions.h"
@@ -16,7 +15,6 @@
 #include "quill/core/LoggerBase.h"
 #include "quill/core/MacroMetadata.h"
 #include "quill/core/Metric.h"
-#include "quill/core/Rdtsc.h"
 #include "quill/core/ThreadPrimitives.h"
 
 #ifndef QUILL_MODULE
@@ -90,6 +88,8 @@ class LoggerImpl : public detail::LoggerBase
 public:
   using frontend_options_t = TFrontendOptions;
   using clock_t = TClock;
+
+  static_assert(!std::is_reference_v<clock_t>, "Clock type must be an object or a pointer");
 
   using clock_type = std::remove_cv_t<std::remove_pointer_t<clock_t>>;
   static constexpr ClockSourceType clock_source = std::is_same_v<clock_type, TscClock>
@@ -718,8 +718,8 @@ private:
   }
 
   /**
-   * Slow path for publish_metric. Mirrors _log_statement_noinline but uses a decoder that simply
-   * consumes the queued metric value without involving the fmt argument store.
+   * Completes a metric when thread initialization or queue recovery is needed.
+   * The caller supplies the timestamp, including zero; metrics do not use the fmt argument store.
    */
   QUILL_NODISCARD QUILL_NOINLINE bool _publish_metric_noinline(MetricMetadata const* metric_metadata,
                                                                uint64_t const current_timestamp, double value)
@@ -1049,7 +1049,7 @@ private:
     return write_buffer;
   }
 
-  clock_t _clock;
+  clock_t const _clock;
 };
 
 using Logger = LoggerImpl<FrontendOptions>;
