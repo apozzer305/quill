@@ -136,15 +136,6 @@ public:
     return _handle_full_queue(nbytes);
   }
 
-  QUILL_NODISCARD WriteReservation prepare_write_reserve(size_t nbytes)
-  {
-    std::byte* const buffer = prepare_write(nbytes);
-    BoundedSPSCQueue* const bounded_queue = &_producer->bounded_queue;
-    auto reservation = bounded_queue->prepare_write_reserve_cached(nbytes);
-    reservation.write_buffer = buffer;
-    return WriteReservation{reservation.write_buffer, reservation.writer_pos, bounded_queue};
-  }
-
   QUILL_NODISCARD QUILL_ATTRIBUTE_HOT WriteReservation prepare_write_reserve_cached(size_t nbytes) noexcept
   {
     BoundedSPSCQueue* const bounded_queue = &_producer->bounded_queue;

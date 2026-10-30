@@ -49,7 +49,8 @@ The clock implementation is selected at compile time. Logger creation defaults t
 All clock types use the same inline logging path. TSC reads are inlined, and custom clock
 implementations can be inlined without a virtual call. System clock acquisition retains the
 cost of ``std::chrono::system_clock::now()``. Queue initialization, growth, blocking, and dropping
-are handled separately when needed.
+use a cold fallback only when needed. Selecting a System or custom clock does not force
+logging onto that fallback.
 
 The clock type is part of ``LoggerImpl<TFrontendOptions, TClock>``. Use ``auto*`` for the returned
 logger, or an alias for its concrete type. ``quill::Logger`` remains the default TSC logger.

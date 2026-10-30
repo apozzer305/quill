@@ -190,34 +190,6 @@ TEST_CASE("oversized_capacity_throws_before_allocating")
 }
 #endif
 
-TEST_CASE("bounded_queue_recovered_write_reservation")
-{
-  BoundedSPSCQueue queue{64};
-  auto first = queue.prepare_write_reserve(64);
-  REQUIRE(first.write_buffer);
-  first.bounded_queue->finish_and_commit_write_reservation(first.writer_pos + 64);
-  CHECK_FALSE(queue.prepare_write_reserve_cached(1).write_buffer);
-  CHECK_FALSE(queue.prepare_write_reserve(1).write_buffer);
-
-  REQUIRE(queue.prepare_read());
-  queue.finish_read(64);
-  queue.commit_read();
-
-  // Recovery refreshes the reader cache and preserves the writer position across wraparound.
-  CHECK_FALSE(queue.prepare_write_reserve_cached(8).write_buffer);
-  auto recovered = queue.prepare_write_reserve(8);
-  REQUIRE(recovered.write_buffer);
-  CHECK_EQ(recovered.bounded_queue, &queue);
-  CHECK_EQ(recovered.writer_pos, 64);
-  recovered.write_buffer[0] = std::byte{42};
-  recovered.bounded_queue->finish_and_commit_write_reservation(recovered.writer_pos + 8);
-  REQUIRE(queue.prepare_read());
-  CHECK_EQ(queue.prepare_read()[0], std::byte{42});
-  queue.finish_read(8);
-  queue.commit_read();
-  CHECK(queue.empty());
-}
-
 TEST_SUITE_END();
 
 #if defined(_WIN32) && defined(_MSC_VER) && !defined(__GNUC__)

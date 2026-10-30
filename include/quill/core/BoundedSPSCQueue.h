@@ -105,12 +105,6 @@ public:
     return _storage + (_writer_pos & _mask);
   }
 
-  QUILL_NODISCARD WriteReservation prepare_write_reserve(integer_type n) noexcept
-  {
-    std::byte* const buffer = prepare_write(n);
-    return WriteReservation{buffer, _writer_pos, this};
-  }
-
   QUILL_NODISCARD QUILL_ATTRIBUTE_HOT WriteReservation prepare_write_reserve_cached(integer_type n) noexcept
   {
     integer_type const writer_pos = _writer_pos;
