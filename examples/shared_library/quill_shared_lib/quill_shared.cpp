@@ -26,6 +26,13 @@ void setup_quill()
 
 quill::Logger* get_logger(std::string const& name) { return quill::Frontend::get_logger(name); }
 
+void shutdown_quill()
+{
+  // The unload hook must not access loggers after the owning singletons are destroyed.
+  global_logger_a = nullptr;
+  quill::Backend::stop();
+}
+
 #if (defined(__GNUC__) || defined(__clang__)) && !defined(_WIN32)
 /**
  * Safety net for dlclose() on Linux/macOS: flush pending log messages before the DSO is unmapped.

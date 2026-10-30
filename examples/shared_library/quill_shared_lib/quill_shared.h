@@ -6,4 +6,5 @@
 #include <string>
 
 QUILL_EXPORT void setup_quill();
+QUILL_EXPORT void shutdown_quill();
 QUILL_EXPORT quill::Logger* get_logger(std::string const& name);

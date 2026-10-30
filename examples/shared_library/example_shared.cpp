@@ -116,4 +116,5 @@ int main()
   LOG_CRITICAL(global_logger_a, "This is a log critical example {}", 118);
 
   global_logger_a->flush_log();
+  shutdown_quill();
 }
