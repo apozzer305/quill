@@ -26,7 +26,7 @@ QUILL_BEGIN_EXPORT
  *
  * @note FrontendOptions are intended to be an application-wide choice. Mixing different
  *       TFrontendOptions types is not a supported configuration. Use one set of frontend options
- *       consistently throughout the application. Logger clock types may differ.
+ *       consistently throughout the application. Logger policies may differ.
  *
  * @code
  * struct CustomFrontendOptions : FrontendOptions

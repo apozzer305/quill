@@ -45,6 +45,12 @@ struct MoveOnlyClock
   std::unique_ptr<uint64_t> timestamp;
 };
 
+template <typename TClock>
+struct ClockPolicy : quill::LoggerPolicy
+{
+  using clock_t = TClock;
+};
+
 struct ClockRecord
 {
   uint64_t timestamp;
@@ -85,45 +91,47 @@ TEST_CASE("compile_time_clock_sources")
   other_simulation.timestamp.store(42);
 
   auto* tsc = Frontend::create_logger("clock_sources_tsc", sink);
-  auto* system = Frontend::create_logger("clock_sources_system", {sink},
-                                         quill::PatternFormatterOptions{}, quill::SystemClock{});
-  auto* custom =
-    Frontend::create_logger("clock_sources_custom", sink, quill::PatternFormatterOptions{}, &simulation);
-  auto* other = Frontend::create_logger("clock_sources_other", sink,
-                                        quill::PatternFormatterOptions{}, &other_simulation);
-  auto* value = Frontend::create_logger("clock_sources_value", sink,
-                                        quill::PatternFormatterOptions{}, ValueClock{123});
-  auto* move_only = Frontend::create_logger("clock_sources_move_only", sink, quill::PatternFormatterOptions{},
-                                            MoveOnlyClock{std::make_unique<uint64_t>(456)});
+  auto* system = Frontend::create_logger<ClockPolicy<quill::SystemClock>>(
+    "clock_sources_system", {sink}, quill::PatternFormatterOptions{}, quill::SystemClock{});
+  auto* custom = Frontend::create_logger<ClockPolicy<SimulationClock*>>(
+    "clock_sources_custom", sink, quill::PatternFormatterOptions{}, &simulation);
+  auto* other = Frontend::create_logger<ClockPolicy<SimulationClock*>>(
+    "clock_sources_other", sink, quill::PatternFormatterOptions{}, &other_simulation);
+  auto* value = Frontend::create_logger<ClockPolicy<ValueClock>>(
+    "clock_sources_value", sink, quill::PatternFormatterOptions{}, ValueClock{123});
+  auto* move_only = Frontend::create_logger<ClockPolicy<MoveOnlyClock>>(
+    "clock_sources_move_only", sink, quill::PatternFormatterOptions{},
+    MoveOnlyClock{std::make_unique<uint64_t>(456)});
   auto* clone = Frontend::create_or_get_logger("clock_sources_clone", custom);
 
   CHECK_EQ(tsc->get_clock_source_type(), quill::ClockSourceType::Tsc);
   CHECK_EQ(system->get_clock_source_type(), quill::ClockSourceType::System);
   CHECK_EQ(custom->get_clock_source_type(), quill::ClockSourceType::User);
   CHECK_EQ(clone->get_clock(), &simulation);
-  CHECK_EQ(Frontend::get_logger<SimulationClock*>("clock_sources_custom"), custom);
-  CHECK_EQ(Frontend::get_logger<quill::SystemClock>("clock_sources_system"), system);
-  CHECK_EQ(Frontend::get_logger<ValueClock>("clock_sources_missing"), nullptr);
-  CHECK_EQ(Frontend::get_all_loggers<SimulationClock*>().size(), 3);
+  CHECK_EQ(Frontend::get_logger<ClockPolicy<SimulationClock*>>("clock_sources_custom"), custom);
+  CHECK_EQ(Frontend::get_logger<ClockPolicy<quill::SystemClock>>("clock_sources_system"), system);
+  CHECK_EQ(Frontend::get_logger<ClockPolicy<ValueClock>>("clock_sources_missing"), nullptr);
+  CHECK_EQ(Frontend::get_all_loggers<ClockPolicy<SimulationClock*>>().size(), 3);
   CHECK_EQ(Frontend::get_all_loggers().size(), 1);
-  CHECK_EQ(Frontend::get_valid_logger<quill::SystemClock>(), system);
-  CHECK_EQ(Frontend::create_or_get_logger<SimulationClock*>("clock_sources_clone"), clone);
-  CHECK_EQ(Frontend::create_or_get_logger<MoveOnlyClock>("clock_sources_move_only"), move_only);
+  CHECK_EQ(Frontend::get_valid_logger<ClockPolicy<quill::SystemClock>>(), system);
+  CHECK_EQ(Frontend::create_or_get_logger<ClockPolicy<SimulationClock*>>("clock_sources_clone"), clone);
+  CHECK_EQ(Frontend::create_or_get_logger<ClockPolicy<MoveOnlyClock>>("clock_sources_move_only"), move_only);
   CHECK_EQ(Frontend::create_or_get_logger("clock_sources_move_only", move_only), move_only);
-  CHECK_EQ(Frontend::create_or_get_logger("clock_sources_custom", sink,
-                                          quill::PatternFormatterOptions{}, &other_simulation),
+  CHECK_EQ(Frontend::create_or_get_logger<ClockPolicy<SimulationClock*>>(
+             "clock_sources_custom", sink, quill::PatternFormatterOptions{}, &other_simulation),
            custom);
   CHECK_EQ(custom->get_clock(), &simulation);
 
 #if !defined(QUILL_NO_EXCEPTIONS)
   CHECK_THROWS_AS(Frontend::create_or_get_logger("clock_sources_move_only_clone", move_only), quill::QuillError);
   CHECK_THROWS_AS((void)Frontend::get_logger("clock_sources_custom"), quill::QuillError);
-  CHECK_THROWS_AS((void)Frontend::get_logger<ValueClock>("clock_sources_custom"), quill::QuillError);
+  CHECK_THROWS_AS((void)Frontend::get_logger<ClockPolicy<ValueClock>>("clock_sources_custom"), quill::QuillError);
   CHECK_THROWS_AS(Frontend::create_or_get_logger("clock_sources_custom", sink), quill::QuillError);
-  CHECK_THROWS_AS(Frontend::create_logger("clock_sources_null", sink, quill::PatternFormatterOptions{},
-                                          static_cast<SimulationClock*>(nullptr)),
+  CHECK_THROWS_AS(Frontend::create_logger<ClockPolicy<SimulationClock*>>(
+                    "clock_sources_null", sink, quill::PatternFormatterOptions{},
+                    static_cast<SimulationClock*>(nullptr)),
                   quill::QuillError);
-  CHECK_EQ(Frontend::get_logger<SimulationClock*>("clock_sources_null"), nullptr);
+  CHECK_EQ(Frontend::get_logger<ClockPolicy<SimulationClock*>>("clock_sources_null"), nullptr);
 #endif
 
   // The first event initializes the queue. Zero must be read exactly once and kept intact.

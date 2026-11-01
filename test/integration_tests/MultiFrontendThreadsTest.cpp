@@ -14,6 +14,11 @@
 using namespace quill;
 
 /***/
+struct SystemLoggerPolicy : quill::LoggerPolicy
+{
+  using clock_t = SystemClock;
+};
+
 TEST_CASE("multi_frontend_threads")
 {
   static constexpr size_t number_of_messages = 1000;
@@ -44,13 +49,12 @@ TEST_CASE("multi_frontend_threads")
           }(),
           FileEventNotifier{});
 
-        auto* logger = Frontend::create_or_get_logger(
+        auto* logger = Frontend::create_or_get_logger<SystemLoggerPolicy>(
           logger_name_prefix + std::to_string(i), std::move(file_sink),
           quill::PatternFormatterOptions{
             "%(time) [%(thread_id)] %(short_source_location:<28) LOG_%(log_level:<9) %(logger:<12) "
             "%(message)",
-            "%Y-%m-%d %H:%M:%S.%Qns", Timezone::GmtTime, false},
-          quill::SystemClock{});
+            "%Y-%m-%d %H:%M:%S.%Qns", Timezone::GmtTime, false});
 
         for (size_t j = 0; j < number_of_messages; ++j)
         {
@@ -65,7 +69,7 @@ TEST_CASE("multi_frontend_threads")
   }
 
   // flush all log and remove all loggers
-  for (auto* logger : Frontend::get_all_loggers<SystemClock>())
+  for (auto* logger : Frontend::get_all_loggers<SystemLoggerPolicy>())
   {
     logger->flush_log();
     Frontend::remove_logger(logger);

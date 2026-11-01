@@ -49,14 +49,19 @@ struct MetricClockSink : quill::Sink
 };
 } // namespace
 
+struct MetricLoggerPolicy : quill::LoggerPolicy
+{
+  using clock_t = ZeroMetricClock*;
+};
+
 TEST_CASE("clock_metric_fallback_preserves_zero_timestamp")
 {
   using Frontend = quill::FrontendImpl<MetricClockOptions>;
   ZeroMetricClock clock;
   auto sink = Frontend::create_sink<MetricClockSink>("clock_metric_fallback_sink");
   auto* captured = static_cast<MetricClockSink*>(sink.get());
-  auto* logger = Frontend::create_logger("clock_metric_fallback_logger", sink,
-                                         quill::PatternFormatterOptions{}, &clock);
+  auto* logger = Frontend::create_logger<MetricLoggerPolicy>(
+    "clock_metric_fallback_logger", sink, quill::PatternFormatterOptions{}, &clock);
   auto const* metric =
     Frontend::create_metric("clock_metric_fallback_metric", "clock_metric_fallback_metric");
 

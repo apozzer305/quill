@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "quill/ClockSource.h"
+#include "quill/LoggerPolicy.h"
 #include "quill/core/Attributes.h"
 #include "quill/core/Codec.h"
 #include "quill/core/Common.h"
@@ -79,15 +79,16 @@ QUILL_BEGIN_EXPORT
  * @brief Thread safe logger.
  *
  * Logger must be obtained from create_or_get_logger(), therefore, constructors are private
- * @tparam TClock A concrete clock object or a non-owned pointer to a clock with now() const.
+ * @tparam TLoggerPolicy Per-logger traits derived from LoggerPolicy.
  * Custom clocks return nanoseconds since epoch. TscClock records raw ticks for the backend.
  */
-template <typename TFrontendOptions, typename TClock = TscClock>
+template <typename TFrontendOptions, typename TLoggerPolicy = LoggerPolicy>
 class LoggerImpl : public detail::LoggerBase
 {
 public:
   using frontend_options_t = TFrontendOptions;
-  using clock_t = TClock;
+  using logger_policy_t = TLoggerPolicy;
+  using clock_t = typename logger_policy_t::clock_t;
 
   static_assert(!std::is_reference_v<clock_t>, "Clock type must be an object or a pointer");
 
@@ -996,38 +997,41 @@ private:
    */
   QUILL_ATTRIBUTE_HOT inline void _flush_after_log_statement_if_needed(bool enable_immediate_flush)
   {
-    if (!enable_immediate_flush)
+    if constexpr (logger_policy_t::enable_immediate_flush)
     {
-      return;
-    }
-
-    uint32_t const threshold = _message_flush_threshold.load(std::memory_order_relaxed);
-    if (QUILL_LIKELY(threshold == 0))
-    {
-      return;
-    }
-
-    if (threshold == 1)
-    {
-      if (QUILL_LIKELY(!detail::LoggerBase::is_current_thread_backend_thread()))
+      if (!enable_immediate_flush)
       {
-        this->flush_log();
+        return;
       }
-      return;
-    }
 
-    uint32_t message_count = _messages_since_last_flush.fetch_add(1, std::memory_order_relaxed) + 1;
-    while (message_count >= threshold)
-    {
-      // Only the thread that successfully resets the counter is allowed to flush.
-      if (_messages_since_last_flush.compare_exchange_weak(
-            message_count, 0, std::memory_order_relaxed, std::memory_order_relaxed))
+      uint32_t const threshold = _message_flush_threshold.load(std::memory_order_relaxed);
+      if (QUILL_LIKELY(threshold == 0))
+      {
+        return;
+      }
+
+      if (threshold == 1)
       {
         if (QUILL_LIKELY(!detail::LoggerBase::is_current_thread_backend_thread()))
         {
           this->flush_log();
         }
         return;
+      }
+
+      uint32_t message_count = _messages_since_last_flush.fetch_add(1, std::memory_order_relaxed) + 1;
+      while (message_count >= threshold)
+      {
+        // Only the thread that successfully resets the counter is allowed to flush.
+        if (_messages_since_last_flush.compare_exchange_weak(
+              message_count, 0, std::memory_order_relaxed, std::memory_order_relaxed))
+        {
+          if (QUILL_LIKELY(!detail::LoggerBase::is_current_thread_backend_thread()))
+          {
+            this->flush_log();
+          }
+          return;
+        }
       }
     }
   }

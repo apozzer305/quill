@@ -25,7 +25,7 @@ Can I mix multiple ``FrontendOptions`` specializations in one binary?
 
 This is not a supported configuration.
 
-In normal usage, choose one ``FrontendOptions`` specialization for the application and use the corresponding ``FrontendImpl<T>`` and ``LoggerImpl<T>`` types consistently.
+In normal usage, choose one ``FrontendOptions`` specialization for the application and use the corresponding ``FrontendImpl<T>`` consistently. Different ``LoggerPolicy`` types may share those frontend options.
 
 In particular, Quill maintains a single thread-local frontend context per thread, so mixing different frontend specializations on the same thread is unsupported. The built-in signal-handler path also assumes a single frontend specialization for the process.
 

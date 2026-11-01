@@ -31,6 +31,11 @@ private:
   std::atomic<uint64_t> _timestamp{0};
 };
 
+struct SimulationLoggerPolicy : quill::LoggerPolicy
+{
+  using clock_t = TestSimulationClock*;
+};
+
 auto* create_user_clock_file_logger(std::string const& logger_name, char const* filename,
                                     TestSimulationClock& user_clock)
 {
@@ -44,7 +49,7 @@ auto* create_user_clock_file_logger(std::string const& logger_name, char const* 
     }(),
     FileEventNotifier{});
 
-  return Frontend::create_or_get_logger(
+  return Frontend::create_or_get_logger<SimulationLoggerPolicy>(
     logger_name, std::move(file_sink),
     PatternFormatterOptions{"%(time) %(log_level) %(message)", "%Y-%m-%d %H:%M:%S.%Qns", Timezone::GmtTime, false},
     &user_clock);

@@ -308,6 +308,7 @@ set(HEADER_FILES
         include/quill/Frontend.h
         include/quill/HelperMacros.h
         include/quill/LogFunctions.h
+        include/quill/LoggerPolicy.h
         include/quill/Logger.h
         include/quill/LogMacros.h
         include/quill/SimpleSetup.h

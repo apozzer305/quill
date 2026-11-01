@@ -73,14 +73,11 @@ Disables ``__FILE__`` and ``__LINE__`` information in log statements at compile 
 
 Enables the use of compiler-specific detailed function signatures (such as ``__PRETTY_FUNCTION__`` on GCC/Clang or ``__FUNCSIG__`` on MSVC) instead of the standard ``__FUNCTION__`` in log macros. This option is only relevant when ``%(caller_function)`` is used in the pattern formatter. When enabled, you can further customize the function name display by providing a processing function via ``PatternFormatterOptions::process_function_name``.
 
-.. code:: cmake
-
-    add_compile_definitions(-DQUILL_ENABLE_IMMEDIATE_FLUSH=0)
-
-Immediate flushing blocks the calling thread until a log message has been written to its destination, effectively simulating synchronous logging.
-This feature can be enabled at runtime on a ``Logger`` instance by calling ``logger->set_immediate_flush(1)``.
-Setting ``QUILL_ENABLE_IMMEDIATE_FLUSH=0`` in the preprocessor disables this feature completely, eliminating the conditional branch from the hot path and improving performance.
-When disabled at compile time, ``logger->set_immediate_flush(flush_every_n_messages)`` will have no effect.
+Immediate flushing blocks the caller until a log message reaches its destination.
+Enable it at runtime with ``logger->set_immediate_flush(1)``. To compile automatic-flush
+support out of selected loggers, derive a ``LoggerPolicy`` and override
+``static constexpr bool enable_immediate_flush = false``. Explicit ``flush_log()`` still
+works. See :doc:`timestamp_types` for a compilable policy example.
 
 .. code:: cmake
 

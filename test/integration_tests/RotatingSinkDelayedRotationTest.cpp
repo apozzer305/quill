@@ -57,6 +57,11 @@ std::string format_datetime_suffix(std::chrono::nanoseconds timestamp)
  * — and the next-rotation timer must advance to the future, not stick at the missed
  * boundary, so we don't redundantly rotate on every subsequent write.
  */
+struct SimulationLoggerPolicy : quill::LoggerPolicy
+{
+  using clock_t = TestSimulationClock*;
+};
+
 TEST_CASE("rotating_sink_delayed_rotation")
 {
   static constexpr char const* base_filename = "rotating_sink_delayed_rotation.log";
@@ -91,7 +96,7 @@ TEST_CASE("rotating_sink_delayed_rotation")
     }(),
     FileEventNotifier{}, start_time);
 
-  auto* logger = Frontend::create_or_get_logger(
+  auto* logger = Frontend::create_or_get_logger<SimulationLoggerPolicy>(
     logger_name, std::move(rotating_sink),
     PatternFormatterOptions{"%(message)", "%H:%M:%S.%Qns", Timezone::GmtTime, false}, &user_clock);
 

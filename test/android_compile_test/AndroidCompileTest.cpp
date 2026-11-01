@@ -6,6 +6,11 @@
 
 #include <utility>
 
+struct SystemLoggerPolicy : quill::LoggerPolicy
+{
+  using clock_t = quill::SystemClock;
+};
+
 int main()
 {
   quill::Backend::start();
@@ -17,8 +22,8 @@ int main()
   auto android_sink = quill::Frontend::create_or_get_sink<quill::AndroidSink>(
     "android_sink", std::move(sink_config));
 
-  auto* logger = quill::Frontend::create_or_get_logger(
-    "android_logger", std::move(android_sink), quill::PatternFormatterOptions{}, quill::SystemClock{});
+  auto* logger = quill::Frontend::create_or_get_logger<SystemLoggerPolicy>(
+    "android_logger", std::move(android_sink), quill::PatternFormatterOptions{});
 
   LOG_INFO(logger, "Android compile test {}", 1);
 

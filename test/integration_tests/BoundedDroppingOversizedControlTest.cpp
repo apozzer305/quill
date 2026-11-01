@@ -18,6 +18,11 @@ struct BoundedControlOptions : quill::FrontendOptions
 };
 } // namespace
 
+struct SystemLoggerPolicy : quill::LoggerPolicy
+{
+  using clock_t = quill::SystemClock;
+};
+
 TEST_CASE("bounded_dropping_oversized_control")
 {
 #if defined(QUILL_NO_EXCEPTIONS)
@@ -25,8 +30,8 @@ TEST_CASE("bounded_dropping_oversized_control")
 #else
   using Frontend = quill::FrontendImpl<BoundedControlOptions>;
   auto sink = Frontend::create_sink<quill::NullSink>("bounded_dropping_control_sink");
-  auto* logger = Frontend::create_logger("bounded_dropping_control_logger", sink,
-                                         quill::PatternFormatterOptions{}, quill::SystemClock{});
+  auto* logger = Frontend::create_logger<SystemLoggerPolicy>(
+    "bounded_dropping_control_logger", sink, quill::PatternFormatterOptions{});
   std::string const oversized(8192, 'x');
   CHECK_THROWS_AS(logger->set_mdc("request", oversized), quill::QuillError);
   CHECK_THROWS_AS(logger->erase_mdc(oversized), quill::QuillError);

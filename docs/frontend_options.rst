@@ -24,7 +24,7 @@ It is important to consistently use your custom types throughout the application
 
 .. warning::
 
-   ``FrontendOptions`` are intended to be an application-wide choice. Mixing different ``FrontendImpl<T>`` or ``LoggerImpl<T>`` specializations is not a supported configuration. Use one frontend specialization consistently throughout the application.
+   ``FrontendOptions`` are intended to be an application-wide choice. Mixing different frontend option types is not a supported configuration. Logger policies may differ. Use one frontend specialization consistently throughout the application.
 
 Error Notifications
 -------------------

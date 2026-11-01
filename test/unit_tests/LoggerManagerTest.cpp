@@ -514,7 +514,11 @@ TEST_CASE("get_existing_logger_does_not_copy_source_clock")
     bool* reject_copy;
   };
 
-  using ClockLogger = LoggerImpl<FrontendOptions, CopyTrackedClock>;
+  struct CopyClockPolicy : LoggerPolicy
+  {
+    using clock_t = CopyTrackedClock;
+  };
+  using ClockLogger = LoggerImpl<FrontendOptions, CopyClockPolicy>;
   LoggerManager& manager = LoggerManager::instance();
   size_t copies{0};
   bool reject_copy{false};

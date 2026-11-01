@@ -44,6 +44,11 @@ private:
   std::atomic<uint64_t> _timestamp_ns{0}; // time since epoch - must always be in nanoseconds
 };
 
+struct SimulationLoggerPolicy : quill::LoggerPolicy
+{
+  using clock_t = SimulatedClock*;
+};
+
 int main()
 {
   // Start the backend thread
@@ -59,7 +64,7 @@ int main()
   // Get the console sink and also create a logger using the simulated clock
   auto console_sink = quill::Frontend::create_or_get_sink<quill::ConsoleSink>("sink_id_1");
 
-  auto* logger = quill::Frontend::create_or_get_logger(
+  auto* logger = quill::Frontend::create_or_get_logger<SimulationLoggerPolicy>(
     "root", std::move(console_sink),
     quill::PatternFormatterOptions{
       "%(time) %(short_source_location:<28) LOG_%(log_level:<9) %(logger:<12) %(message)",

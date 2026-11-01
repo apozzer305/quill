@@ -14,6 +14,12 @@ struct FrontendOptions : quill::FrontendOptions
 {
 };
 
+struct BenchmarkLoggerPolicy : quill::LoggerPolicy
+{
+  static constexpr bool enable_immediate_flush = false;
+  using clock_t = quill::SystemClock;
+};
+
 using Frontend = quill::FrontendImpl<FrontendOptions>;
 
 /***/
@@ -48,12 +54,11 @@ void quill_benchmark(std::vector<uint16_t> const& thread_count_array,
     }(),
     quill::FileEventNotifier{});
 
-  auto* logger = Frontend::create_or_get_logger(
+  auto* logger = Frontend::create_or_get_logger<BenchmarkLoggerPolicy>(
     "bench_logger", std::move(file_sink),
     quill::PatternFormatterOptions{
       "%(time) [%(thread_id)] %(short_source_location) %(log_level) %(message)", "%H:%M:%S.%Qns",
-      quill::Timezone::LocalTime, false},
-    quill::SystemClock{});
+      quill::Timezone::LocalTime, false});
 
   // Measure enabled logging regardless of the application environment.
   logger->set_log_level(quill::LogLevel::Info);

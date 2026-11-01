@@ -18,6 +18,11 @@ using namespace quill;
 /**
  * Redirect the signal handler error to specific Logger
  */
+struct SystemLoggerPolicy : quill::LoggerPolicy
+{
+  using clock_t = SystemClock;
+};
+
 TEST_CASE("signal_handler_logger")
 {
   static constexpr char const* filename_a = "signal_handler_logger_a.log";
@@ -42,32 +47,32 @@ TEST_CASE("signal_handler_logger")
   quill::init_signal_handler<quill::FrontendOptions>();
 #endif
 
-  auto* logger_a = Frontend::create_or_get_logger(logger_name_a,
-                                                  Frontend::create_or_get_sink<FileSink>(
-                                                    filename_a,
-                                                    []()
-                                                    {
-                                                      FileSinkConfig cfg;
-                                                      cfg.set_open_mode('w');
-                                                      cfg.set_fsync_enabled(true);
-                                                      return cfg;
-                                                    }(),
-                                                    FileEventNotifier{}),
-                                                  PatternFormatterOptions{}, SystemClock{});
+  auto* logger_a = Frontend::create_or_get_logger<SystemLoggerPolicy>(logger_name_a,
+                                                                      Frontend::create_or_get_sink<FileSink>(
+                                                                        filename_a,
+                                                                        []()
+                                                                        {
+                                                                          FileSinkConfig cfg;
+                                                                          cfg.set_open_mode('w');
+                                                                          cfg.set_fsync_enabled(true);
+                                                                          return cfg;
+                                                                        }(),
+                                                                        FileEventNotifier{}),
+                                                                      PatternFormatterOptions{});
 
   // Create the logger for the signal handler to find it
-  Frontend::create_or_get_logger(logger_name_b,
-                                 Frontend::create_or_get_sink<FileSink>(
-                                   filename_b,
-                                   []()
-                                   {
-                                     FileSinkConfig cfg;
-                                     cfg.set_open_mode('w');
-                                     cfg.set_fsync_enabled(true);
-                                     return cfg;
-                                   }(),
-                                   FileEventNotifier{}),
-                                 PatternFormatterOptions{}, SystemClock{});
+  Frontend::create_or_get_logger<SystemLoggerPolicy>(logger_name_b,
+                                                     Frontend::create_or_get_sink<FileSink>(
+                                                       filename_b,
+                                                       []()
+                                                       {
+                                                         FileSinkConfig cfg;
+                                                         cfg.set_open_mode('w');
+                                                         cfg.set_fsync_enabled(true);
+                                                         return cfg;
+                                                       }(),
+                                                       FileEventNotifier{}),
+                                                     PatternFormatterOptions{});
 
   for (size_t i = 0; i < number_of_messages; ++i)
   {
@@ -89,7 +94,7 @@ TEST_CASE("signal_handler_logger")
   }
 
   // Wait until the backend thread stops for test stability
-  for (auto* logger : Frontend::get_all_loggers<SystemClock>())
+  for (auto* logger : Frontend::get_all_loggers<SystemLoggerPolicy>())
   {
     logger->flush_log();
     Frontend::remove_logger(logger);

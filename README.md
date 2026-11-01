@@ -234,7 +234,7 @@ logger->publish_metric(requests_total, 1.0);
 See the [Metrics guide](https://quillcpp.readthedocs.io/en/latest/metrics.html) for sink setup, custom sinks, and
 Prometheus integration.
 
-### Clock migration
+### Logger policies and clock migration
 
 Custom clocks no longer inherit from `quill::UserClockSource`: remove its header include, base class and
 `virtual`/`override` specifiers, keeping your existing `now()` implementation. Pass the clock pointer without the
@@ -250,14 +250,23 @@ struct SimClock
   std::atomic<uint64_t> timestamp_ns{0}; // Nanoseconds since epoch.
 };
 
+struct SimLoggerPolicy : quill::LoggerPolicy
+{
+  using clock_t = SimClock*;
+  // static constexpr bool enable_immediate_flush = false; // Optional.
+};
+
 SimClock sim_clock;
-auto* logger = quill::Frontend::create_or_get_logger(
+auto* logger = quill::Frontend::create_or_get_logger<SimLoggerPolicy>(
   "simulation", sink, quill::PatternFormatterOptions{}, &sim_clock);
 ```
 
-Use `auto*` for the logger and `quill::Frontend::get_logger<SimClock*>("simulation")` for lookups.
+Use `auto*` for the logger and `quill::Frontend::get_logger<SimLoggerPolicy>("simulation")` for lookups.
 Keep the clock alive until logger removal.
-System-clock callers replace the old enum argument with `quill::SystemClock{}`; default TSC usage is unchanged.
+Policies inherit defaults from `quill::LoggerPolicy`: `clock_t = quill::TscClock` and `enable_immediate_flush = true`.
+Override `clock_t` with `quill::SystemClock` for system time. Replace the old `QUILL_ENABLE_IMMEDIATE_FLUSH=0`
+macro with `enable_immediate_flush = false` in a policy; explicit `flush_log()` still works.
+Default TSC usage is unchanged.
 See the [full custom-clock example](examples/user_clock_source.cpp).
 
 ---
@@ -707,13 +716,18 @@ configure with:
 -DQUILL_NO_THREAD_NAME_SUPPORT:BOOL=ON
 ```
 
-For timestamps, pass `quill::SystemClock{}` when creating a logger. Quill also includes an
+For timestamps, select `quill::SystemClock` in a logger policy. Quill also includes an
 `AndroidSink` for Android's logging system.
 
 #### Minimal Example to Start Logging on Android
 
 ```c++
 quill::Backend::start();
+
+struct AndroidLoggerPolicy : quill::LoggerPolicy
+{
+  using clock_t = quill::SystemClock;
+};
 
 auto sink = quill::Frontend::create_or_get_sink<quill::AndroidSink>("app", [](){
     quill::AndroidSinkConfig asc;
@@ -722,9 +736,8 @@ auto sink = quill::Frontend::create_or_get_sink<quill::AndroidSink>("app", [](){
     return asc;
 }());
 
-auto logger = quill::Frontend::create_or_get_logger("root", std::move(sink),
-                                                    quill::PatternFormatterOptions {}, 
-                                                    quill::SystemClock{});
+auto* logger = quill::Frontend::create_or_get_logger<AndroidLoggerPolicy>(
+  "root", std::move(sink));
 
 LOG_INFO(logger, "Test {}", 123);
 ```

@@ -12,6 +12,11 @@
  * TSC-based clock source.
  */
 
+struct SystemLoggerPolicy : quill::LoggerPolicy
+{
+  using clock_t = quill::SystemClock;
+};
+
 int main()
 {
   // Start the backend thread
@@ -21,11 +26,10 @@ int main()
   // Frontend
   auto console_sink = quill::Frontend::create_or_get_sink<quill::ConsoleSink>("sink_id_1");
 
-  auto* logger = quill::Frontend::create_or_get_logger(
+  auto* logger = quill::Frontend::create_or_get_logger<SystemLoggerPolicy>(
     "root", std::move(console_sink),
     quill::PatternFormatterOptions{"%(time) [%(process_id)] [%(thread_id)] %(logger) - %(message)",
-                                   "%D %H:%M:%S.%Qms %z", quill::Timezone::GmtTime, false},
-    quill::SystemClock{});
+                                   "%D %H:%M:%S.%Qms %z", quill::Timezone::GmtTime, false});
 
   // Change the LogLevel to print everything
   logger->set_log_level(quill::LogLevel::TraceL3);

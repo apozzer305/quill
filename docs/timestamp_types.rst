@@ -35,49 +35,54 @@ There are several ways to get the timestamp on the frontend:
 
 - **User**: This method allows the user to provide a custom timestamp in nanoseconds since epoch through a concrete clock type with a ``uint64_t now() const`` member. This is useful, for example, in simulations where you want to display a custom timestamp rather than the current one in the log statements.
 
-Choosing a Clock
-----------------
+Logger Policies
+---------------
 
-The clock implementation is selected at compile time. Logger creation defaults to
-``quill::TscClock``. Pass ``quill::SystemClock{}`` as the clock argument to use system time:
+``quill::LoggerPolicy`` defines per-logger compile-time traits. Its defaults are
+``using clock_t = quill::TscClock`` and ``enable_immediate_flush = true``. Derive from
+``LoggerPolicy`` and override only the members that change; future defaults are inherited
+automatically. Different policies share thread queues when they use the same
+``FrontendOptions``. No policy object is stored in a logger.
 
-.. code-block:: cpp
+.. literalinclude:: snippets/quill_docs_logger_policy.cpp
+   :language: cpp
+   :linenos:
 
-   auto* logger = quill::Frontend::create_or_get_logger(
-     "main", sink, quill::PatternFormatterOptions{}, quill::SystemClock{});
+Select a policy with ``Frontend::create_logger<MyPolicy>(...)`` or
+``Frontend::create_or_get_logger<MyPolicy>(...)``. The default policy preserves ordinary
+TSC logging. The policy type is part of ``LoggerImpl<TFrontendOptions, TLoggerPolicy>``;
+use ``auto*`` for the returned logger. ``quill::Logger`` uses the default frontend options
+and policy.
 
-All clock types use the same inline logging path. TSC reads are inlined, and custom clock
-implementations can be inlined without a virtual call. System clock acquisition retains the
-cost of ``std::chrono::system_clock::now()``. Queue initialization, growth, blocking, and dropping
-use a cold fallback only when needed. Selecting a System or custom clock does not force
-logging onto that fallback.
+All clock types use the same inline logging path. Clock selection is resolved at compile
+time; only thread initialization or queue recovery selects the cold fallback.
+``ClockSourceType`` and ``get_clock_source_type()`` remain available for introspection
+and backend timestamp conversion and ordering.
 
-``ClockSourceType`` and ``get_clock_source_type()`` remain available for introspection.
-The backend uses this classification for timestamp conversion and ordering; frontend clock
-selection is resolved at compile time.
-
-The clock type is part of ``LoggerImpl<TFrontendOptions, TClock>``. Use ``auto*`` for the returned
-logger, or an alias for its concrete type. ``quill::Logger`` remains the default TSC logger.
-Loggers with different clock types may coexist and share the same frontend queues; use the
-same ``TFrontendOptions`` throughout the application.
-
-For named lookup, specify the same clock type used at creation:
+For lookup, specify the same policy used at creation:
 
 .. code-block:: cpp
 
-   auto* logger = quill::Frontend::get_logger<quill::SystemClock>("main");
+   auto* logger = quill::Frontend::get_logger<MyPolicy>("main");
 
-``get_all_loggers<TClock>()`` and ``get_valid_logger<TClock>()`` select only loggers with that
-clock type and frontend options. Their default clock type is ``quill::TscClock``. A named lookup
-or ``create_or_get_logger`` with an incompatible type reports an error, including in builds
-without RTTI. Cloning from a typed logger preserves its clock object or pointer.
-When RTTI is disabled, use named clock and frontend-option types with external linkage and
-the same compiler when sharing typed loggers across shared libraries.
+``get_all_loggers<MyPolicy>()`` and ``get_valid_logger<MyPolicy>()`` select only loggers
+with that policy and frontend options. Named lookup or ``create_or_get_logger`` reports
+an incompatible existing policy, including when RTTI is disabled. Cloning preserves the
+policy and copies its clock object or pointer when a new logger is needed.
+When RTTI is disabled, use named clock and policy types with external linkage and the
+same compiler when sharing typed loggers across shared libraries.
+
+Setting ``enable_immediate_flush = false`` removes automatic-flush handling from that
+logger's hot path. Its ``set_immediate_flush()`` setting has no effect, while explicit
+``flush_log()`` still works. The former ``QUILL_ENABLE_IMMEDIATE_FLUSH`` macro and Bazel
+``enable_immediate_flush`` build setting are replaced by this per-logger policy member.
+The runtime flush threshold remains configurable for policies that enable the feature.
 
 Providing a Custom Timestamp
 ----------------------------
 
-A custom clock supplies ``uint64_t now() const`` returning nanoseconds since epoch. Pass a
+Set ``MyPolicy::clock_t`` to a custom clock object type or pointer type, and pass its
+instance as the clock argument at logger creation. A custom clock supplies ``uint64_t now() const`` returning nanoseconds since epoch. Pass a
 copyable or movable clock object by value, or a non-null pointer to an application-owned clock.
 Quill stores the object or pointer in the logger. Pointer-based clocks must remain alive until
 the logger is removed and no thread can log through it. Cloned loggers copy the clock object

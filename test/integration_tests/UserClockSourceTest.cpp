@@ -45,6 +45,11 @@ private:
 };
 
 /***/
+struct SimulationLoggerPolicy : quill::LoggerPolicy
+{
+  using clock_t = TestSimulationClock*;
+};
+
 TEST_CASE("user_clock_source")
 {
   static constexpr size_t number_of_messages = 10;
@@ -68,7 +73,7 @@ TEST_CASE("user_clock_source")
     }(),
     FileEventNotifier{});
 
-  auto* logger = Frontend::create_or_get_logger(
+  auto* logger = Frontend::create_or_get_logger<SimulationLoggerPolicy>(
     logger_name, std::move(file_sink),
     PatternFormatterOptions{"%(time) %(log_level) %(logger:<16) %(message)", // format
                             "%Y-%m-%d %H:%M:%S.%Qms",                        // timestamp format

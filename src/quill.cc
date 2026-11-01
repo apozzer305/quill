@@ -164,6 +164,7 @@ import std;
 #include "quill/DirectFormatCodec.h"
 #include "quill/Frontend.h"
 #include "quill/LogFunctions.h"
+#include "quill/LoggerPolicy.h"
 #include "quill/Logger.h"
 #include "quill/SimpleSetup.h"
 #include "quill/StringRef.h"
