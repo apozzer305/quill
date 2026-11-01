@@ -6,6 +6,10 @@
 
 #pragma once
 
+#if defined(QUILL_ENABLE_IMMEDIATE_FLUSH)
+  #error "Replace QUILL_ENABLE_IMMEDIATE_FLUSH with LoggerPolicy::enable_immediate_flush"
+#endif
+
 #ifndef QUILL_USE_MODULE
   #include "quill/core/Attributes.h"
   #include "quill/core/ChronoTimeUtils.h"

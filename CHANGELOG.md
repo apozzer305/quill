@@ -108,6 +108,8 @@
 
 - Added `LoggerPolicy` for per-logger clock types and automatic-flush support. Derive from it to override
   defaults; replace `UserClockSource`, clock enum arguments, and `QUILL_ENABLE_IMMEDIATE_FLUSH` with a policy.
+- Defining the removed `QUILL_ENABLE_IMMEDIATE_FLUSH` flag before either logging header now reports
+  the policy migration error even when `Logger.h` was included first.
 - `Frontend::create_or_get_logger(name, source_logger)` retrieves existing loggers without copying
   the source clock, so lookups do not fail if a custom clock's copy constructor throws.
 - On macOS, `%(thread_name)` now shows thread names longer than 15 characters in full instead of
