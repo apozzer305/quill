@@ -227,14 +227,13 @@ public:
     return logger_base;
   }
 
-  /** Access private logger hooks through the existing signal-handler context. */
-  static bool log_signal(LoggerBase* logger, MacroMetadata const* metadata,
-                         char const* description = "", uint32_t code = 0)
-  {
-    return logger->log_signal(metadata, description, code);
-  }
+  static void on_signal(int32_t signal_number);
 
-  static void flush_logger(LoggerBase* logger) { logger->flush_signal_handler(); }
+#if defined(_WIN32)
+  static BOOL WINAPI on_console_signal(DWORD signal);
+
+  static LONG WINAPI on_exception(EXCEPTION_POINTERS* exception_p);
+#endif
 
   std::vector<std::string> excluded_logger_substrings{};
   std::string logger_name{};
@@ -265,13 +264,12 @@ private:
       static constexpr quill::MacroMetadata macro_metadata{                                        \
         "SignalHandler:~", "", fmt, nullptr, log_level, quill::MacroMetadata::Event::Log};         \
                                                                                                    \
-      SignalHandlerContext::log_signal(logger, &macro_metadata, ##__VA_ARGS__);                    \
+      logger->log_signal(&macro_metadata, ##__VA_ARGS__);                                          \
     }                                                                                              \
   } while (0)
 
 /***/
-template <typename TFrontendOptions>
-void on_signal(int32_t signal_number)
+inline void SignalHandlerContext::on_signal(int32_t signal_number)
 {
   // This handler can be entered by multiple threads.
   uint32_t const lock = SignalHandlerContext::instance().lock.fetch_add(1);
@@ -331,7 +329,7 @@ void on_signal(int32_t signal_number)
       {
         // For SIGINT and SIGTERM, we are shutting down gracefully
         // Pass `0` to avoid calling std::this_thread::sleep_for()
-        SignalHandlerContext::flush_logger(logger);
+        logger->flush_signal_handler();
         std::_Exit(EXIT_SUCCESS);
       }
 
@@ -342,11 +340,11 @@ void on_signal(int32_t signal_number)
                                  signal_desc, signal_number);
 
         // This is here in order to flush the above log statement
-        SignalHandlerContext::flush_logger(logger);
+        logger->flush_signal_handler();
       }
       else
       {
-        SignalHandlerContext::flush_logger(logger);
+        logger->flush_signal_handler();
       }
     }
 
@@ -446,8 +444,7 @@ inline char const* get_error_message(DWORD ex_code)
 }
 
 /***/
-template <typename TFrontendOptions>
-BOOL WINAPI on_console_signal(DWORD signal)
+inline BOOL WINAPI SignalHandlerContext::on_console_signal(DWORD signal)
 {
   uint32_t const backend_thread_id = SignalHandlerContext::instance().backend_thread_id.load();
   uint32_t const current_thread_id = get_thread_id();
@@ -466,7 +463,7 @@ BOOL WINAPI on_console_signal(DWORD signal)
                                "Program interrupted by Ctrl+C or Ctrl+Break signal");
 
       // Pass `0` to avoid calling std::this_thread::sleep_for()
-      SignalHandlerContext::flush_logger(logger);
+      logger->flush_signal_handler();
       std::_Exit(EXIT_SUCCESS);
     }
   }
@@ -475,8 +472,7 @@ BOOL WINAPI on_console_signal(DWORD signal)
 }
 
 /***/
-template <typename TFrontendOptions>
-LONG WINAPI on_exception(EXCEPTION_POINTERS* exception_p)
+inline LONG WINAPI SignalHandlerContext::on_exception(EXCEPTION_POINTERS* exception_p)
 {
   uint32_t const backend_thread_id = SignalHandlerContext::instance().backend_thread_id.load();
   uint32_t const current_thread_id = get_thread_id();
@@ -501,7 +497,7 @@ LONG WINAPI on_exception(EXCEPTION_POINTERS* exception_p)
                                exception_p->ExceptionRecord->ExceptionCode);
 
       // Pass `0` to avoid calling std::this_thread::sleep_for()
-      SignalHandlerContext::flush_logger(logger);
+      logger->flush_signal_handler();
     }
   }
 
@@ -521,7 +517,7 @@ void deinit_exception_handler()
 
   if (ctx.console_ctrl_handler_installed)
   {
-    SetConsoleCtrlHandler(on_console_signal<TFrontendOptions>, FALSE);
+    SetConsoleCtrlHandler(SignalHandlerContext::on_console_signal, FALSE);
     ctx.console_ctrl_handler_installed = false;
   }
 
@@ -538,9 +534,10 @@ void init_exception_handler()
   std::lock_guard<std::mutex> const lock{ctx.signal_handlers_mutex};
 
   ctx.exception_handler_deinit_callback = nullptr;
-  ctx.previous_exception_filter = SetUnhandledExceptionFilter(on_exception<TFrontendOptions>);
+  ctx.previous_exception_filter =
+    SetUnhandledExceptionFilter(SignalHandlerContext::on_exception);
 
-  if (!SetConsoleCtrlHandler(on_console_signal<TFrontendOptions>, TRUE))
+  if (!SetConsoleCtrlHandler(SignalHandlerContext::on_console_signal, TRUE))
   {
     SetUnhandledExceptionFilter(ctx.previous_exception_filter);
     ctx.previous_exception_filter = nullptr;
@@ -573,7 +570,8 @@ void init_signal_handler(std::vector<int> const& catchable_signals = std::vector
   for (auto const& catchable_signal : catchable_signals)
   {
     // setup a signal handler per signal in the array
-    auto const previous_handler = std::signal(catchable_signal, detail::on_signal<TFrontendOptions>);
+    auto const previous_handler =
+      std::signal(catchable_signal, detail::SignalHandlerContext::on_signal);
     if (previous_handler == SIG_ERR)
     {
       detail::restore_signal_handler_entries(previous_signal_handlers);
@@ -656,7 +654,8 @@ void init_signal_handler(std::vector<int> const& catchable_signals)
     }
 
     // set up a signal handler per signal in the array
-    auto const previous_handler = std::signal(catchable_signal, on_signal<TFrontendOptions>);
+    auto const previous_handler =
+      std::signal(catchable_signal, SignalHandlerContext::on_signal);
     if (previous_handler == SIG_ERR)
     {
       restore_signal_handler_entries(previous_signal_handlers);

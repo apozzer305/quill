@@ -19,8 +19,8 @@ TEST_CASE("windows_console_signal_handler_returns_false_when_unhandled")
 
   ctx.backend_thread_id.store(different_backend_thread_id);
 
-  CHECK_EQ(detail::on_console_signal<FrontendOptions>(CTRL_C_EVENT), FALSE);
-  CHECK_EQ(detail::on_console_signal<FrontendOptions>(CTRL_CLOSE_EVENT), FALSE);
+  CHECK_EQ(detail::SignalHandlerContext::on_console_signal(CTRL_C_EVENT), FALSE);
+  CHECK_EQ(detail::SignalHandlerContext::on_console_signal(CTRL_CLOSE_EVENT), FALSE);
 
   ctx.backend_thread_id.store(previous_backend_thread_id);
 #else

@@ -7,6 +7,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <csignal>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -163,16 +164,17 @@ TEST_CASE("compile_time_clock_sources")
   LOG_INFO(system, "system");
   LOG_INFO(tsc, "tsc");
 
-  // The erased signal callback must use this logger's concrete clock implementation.
-  static constexpr quill::MacroMetadata signal_metadata{
-    "SignalHandler:~",     "",
-    "signal {} {}",        nullptr,
-    quill::LogLevel::Info, quill::MacroMetadata::Event::Log};
-  quill::detail::LoggerBase* erased = custom;
-  REQUIRE(quill::detail::SignalHandlerContext::log_signal(erased, &signal_metadata, "test", 12));
-
-  quill::Backend::start();
-  quill::detail::SignalHandlerContext::flush_logger(erased);
+  // Exercise the real signal handler with a custom clock and erased logger pointer.
+  custom->set_log_level(quill::LogLevel::Info);
+  quill::SignalHandlerOptions signal_options;
+  signal_options.catchable_signals = {SIGABRT};
+  signal_options.logger_name = "clock_sources_custom";
+  quill::Backend::start<ClockTestOptions>(quill::BackendOptions{}, signal_options);
+  quill::detail::SignalHandlerContext::instance().should_reraise_signal.store(false);
+#if defined(_WIN32)
+  quill::init_signal_handler<ClockTestOptions>({SIGABRT});
+#endif
+  CHECK_EQ(std::raise(SIGABRT), 0);
   CHECK_EQ(simulation.reads.load(), 27);
   Frontend::remove_logger_blocking(clone);
   Frontend::remove_logger_blocking(custom);
@@ -201,7 +203,8 @@ TEST_CASE("compile_time_clock_sources")
   CHECK_GE(captured->logs[26].timestamp, earliest_system_time);
   CHECK_GT(captured->logs[27].timestamp, 0);
   CHECK_EQ(captured->logs[28].timestamp, 999);
-  CHECK_EQ(captured->logs[28].message, "signal test 12");
+  CHECK_EQ(captured->logs[28].message,
+           "Received signal: SIGABRT (signum: " + std::to_string(SIGABRT) + ")");
   REQUIRE_EQ(captured->metrics.size(), 2);
   CHECK_EQ(captured->metrics[0].timestamp, 0);
   CHECK_EQ(captured->metrics[1].timestamp, 0);

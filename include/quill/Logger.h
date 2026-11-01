@@ -104,16 +104,9 @@ private:
   template <typename>
   friend class FrontendImpl;
 
-  /** A shared token per specialization; only checked lookup without RTTI uses it. */
-  static inline void const* logger_type_id() noexcept
-  {
-    static char token;
-    return &token;
-  }
-
   QUILL_NODISCARD void const* get_logger_type_id() const noexcept override
   {
-    return logger_type_id();
+    return &_logger_type_token;
   }
 
   /** Cold dispatch through LoggerBase; normal logging calls log_statement() directly. */
@@ -1060,6 +1053,8 @@ private:
     return write_buffer;
   }
 
+  // Address identity only: static storage is shared per specialization, not per logger.
+  inline static char _logger_type_token;
   clock_t const _clock;
 };
 

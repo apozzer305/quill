@@ -580,7 +580,7 @@ private:
     // Without RTTI, compare specialization tokens. Hidden shared libraries may have
     // separate tokens for the same C++ type; keep creation and typed lookup in the
     // owning library and expose exported wrappers across that boundary.
-    return logger_base->get_logger_type_id() == LoggerImpl<frontend_options_t, TLoggerPolicy>::logger_type_id();
+    return logger_base->get_logger_type_id() == &LoggerImpl<frontend_options_t, TLoggerPolicy>::_logger_type_token;
 #endif
   }
 
