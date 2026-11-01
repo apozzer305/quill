@@ -577,22 +577,10 @@ private:
 #if QUILL_USE_RTTI
     return dynamic_cast<LoggerImpl<frontend_options_t, TLoggerPolicy>*>(logger_base) != nullptr;
 #else
-    auto const* actual = logger_base->get_type_info();
-    auto const* expected = LoggerImpl<frontend_options_t, TLoggerPolicy>::type_info();
-    if (actual == expected)
-    {
-      return true;
-    }
-
-    // Hidden template instantiations can have separate type identities across shared libraries.
-    // Compare compiler signatures for named types, but keep translation-unit-local types
-    // distinct even when their printed names happen to match.
-    std::string_view const name = expected->name;
-    return name == actual->name && name.find("{anonymous}") == std::string_view::npos &&
-      name.find("anonymous namespace") == std::string_view::npos &&
-      name.find("<unnamed") == std::string_view::npos && name.find("<lambda") == std::string_view::npos &&
-      name.find("(lambda at") == std::string_view::npos &&
-      name.find('`') == std::string_view::npos && name.find(")::") == std::string_view::npos;
+    // Without RTTI, compare specialization tokens. Hidden shared libraries may have
+    // separate tokens for the same C++ type; keep creation and typed lookup in the
+    // owning library and expose exported wrappers across that boundary.
+    return logger_base->get_logger_type_id() == LoggerImpl<frontend_options_t, TLoggerPolicy>::logger_type_id();
 #endif
   }
 

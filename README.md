@@ -148,11 +148,11 @@ For the shortest path from zero to working logs, use `simple_logger()`:
 int main()
 {
   // log to the console
-  auto* logger = quill::simple_logger();
+  quill::Logger* logger = quill::simple_logger();
   LOG_INFO(logger, "Hello from {}!", "Quill");
 
   // log to a file
-  auto* logger2 = quill::simple_logger("test.log");
+  quill::Logger* logger2 = quill::simple_logger("test.log");
   LOG_WARNING(logger2, "This message goes to a file");
 }
 ```
@@ -256,16 +256,19 @@ struct SimLoggerPolicy : quill::LoggerPolicy
   // static constexpr bool enable_immediate_flush = false; // Optional.
 };
 
+using SimLogger = quill::LoggerImpl<quill::FrontendOptions, SimLoggerPolicy>;
+
 SimClock sim_clock;
-auto* logger = quill::Frontend::create_or_get_logger<SimLoggerPolicy>(
+SimLogger* logger = quill::Frontend::create_or_get_logger<SimLoggerPolicy>(
   "simulation", sink, quill::PatternFormatterOptions{}, &sim_clock);
 ```
 
-Use `auto*` for the logger and `quill::Frontend::get_logger<SimLoggerPolicy>("simulation")` for lookups.
+The `SimLogger` alias makes the policy part of the logger type explicit. Retrieve it with
+`quill::Frontend::get_logger<SimLoggerPolicy>("simulation")`.
 Keep the clock alive until logger removal.
 Policies inherit defaults from `quill::LoggerPolicy`: `clock_t = quill::TscClock` and `enable_immediate_flush = true`.
-Override `clock_t` with `quill::SystemClock` for system time. Replace the old `QUILL_ENABLE_IMMEDIATE_FLUSH=0`
-macro with `enable_immediate_flush = false` in a policy; explicit `flush_log()` still works.
+Override `clock_t` with `quill::SystemClock` for system time. Set `enable_immediate_flush = false`
+in a policy to omit automatic-flush handling; explicit `flush_log()` still works.
 Default TSC usage is unchanged.
 See the [full custom-clock example](examples/user_clock_source.cpp).
 
@@ -736,7 +739,8 @@ auto sink = quill::Frontend::create_or_get_sink<quill::AndroidSink>("app", [](){
     return asc;
 }());
 
-auto* logger = quill::Frontend::create_or_get_logger<AndroidLoggerPolicy>(
+using AndroidLogger = quill::LoggerImpl<quill::FrontendOptions, AndroidLoggerPolicy>;
+AndroidLogger* logger = quill::Frontend::create_or_get_logger<AndroidLoggerPolicy>(
   "root", std::move(sink));
 
 LOG_INFO(logger, "Test {}", 123);

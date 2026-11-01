@@ -19,6 +19,8 @@ set(EXAMPLE_TARGETS
         quill_docs_example_tags_with_custom_sink
         quill_docs_example_unbuffered_stream
         quill_docs_quick_start
+        quill_docs_quick_start_minimal
+        quill_docs_quick_start_macro_free
         quill_docs_logger_policy
         quill_docs_timestamp_types
 )

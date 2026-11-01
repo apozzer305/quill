@@ -51,8 +51,8 @@ automatically. Different policies share thread queues when they use the same
 Select a policy with ``Frontend::create_logger<MyPolicy>(...)`` or
 ``Frontend::create_or_get_logger<MyPolicy>(...)``. The default policy preserves ordinary
 TSC logging. The policy type is part of ``LoggerImpl<TFrontendOptions, TLoggerPolicy>``;
-use ``auto*`` for the returned logger. ``quill::Logger`` uses the default frontend options
-and policy.
+use that explicit type or a named alias for the returned logger. ``quill::Logger`` uses
+the default frontend options and policy.
 
 All clock types use the same inline logging path. Clock selection is resolved at compile
 time; only thread initialization or queue recovery selects the cold fallback.
@@ -63,20 +63,22 @@ For lookup, specify the same policy used at creation:
 
 .. code-block:: cpp
 
-   auto* logger = quill::Frontend::get_logger<MyPolicy>("main");
+   using MyLogger = quill::LoggerImpl<quill::FrontendOptions, MyPolicy>;
+   MyLogger* logger = quill::Frontend::get_logger<MyPolicy>("main");
 
 ``get_all_loggers<MyPolicy>()`` and ``get_valid_logger<MyPolicy>()`` select only loggers
 with that policy and frontend options. Named lookup or ``create_or_get_logger`` reports
 an incompatible existing policy, including when RTTI is disabled. Cloning preserves the
 policy and copies its clock object or pointer when a new logger is needed.
-When RTTI is disabled, use named clock and policy types with external linkage and the
-same compiler when sharing typed loggers across shared libraries.
+Without RTTI, checked lookup compares a token for the complete logger specialization.
+Hidden shared libraries may have separate tokens for the same C++ type. Perform creation
+and typed lookup inside the owning library and expose exported wrapper functions, as in
+``examples/shared_library``. RTTI-enabled lookup supports compatible types across libraries.
 
 Setting ``enable_immediate_flush = false`` removes automatic-flush handling from that
 logger's hot path. Its ``set_immediate_flush()`` setting has no effect, while explicit
-``flush_log()`` still works. The former ``QUILL_ENABLE_IMMEDIATE_FLUSH`` macro and Bazel
-``enable_immediate_flush`` build setting are replaced by this per-logger policy member.
-The runtime flush threshold remains configurable for policies that enable the feature.
+``flush_log()`` still works. Configure this through the policy rather than a global build
+setting. The runtime flush threshold remains configurable for policies that enable the feature.
 
 Providing a Custom Timestamp
 ----------------------------

@@ -20,16 +20,8 @@ For the quickest and simplest setup, use ``simple_logger()`` with the recommende
 
 Alternatively, a **macro-free interface** is available if you prefer function-call syntax:
 
-.. code-block:: cpp
-
-   #include "quill/LogFunctions.h"
-   #include "quill/SimpleSetup.h"
-
-   int main()
-   {
-     auto* logger = quill::simple_logger();
-     quill::info(logger, "Hello from {}!", "Quill");
-   }
+.. literalinclude:: snippets/quill_docs_quick_start_macro_free.cpp
+   :language: cpp
 
 The ``LOG_*`` macros are recommended for lowest latency — they avoid evaluating arguments when the
 log level is disabled and resolve metadata at compile time. The macro-free functions

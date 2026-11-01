@@ -22,7 +22,7 @@ int main()
   quill::Backend::start();
 
   // Create or get a logger with a console sink, using TSC as the clock source which is already the default
-  auto* logger = quill::Frontend::create_or_get_logger(
+  quill::Logger* logger = quill::Frontend::create_or_get_logger(
     "root", quill::Frontend::create_or_get_sink<quill::ConsoleSink>("sink_id_1"),
     quill::PatternFormatterOptions{}, quill::TscClock{});
 

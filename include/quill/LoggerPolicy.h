@@ -8,9 +8,6 @@
 
 #include "quill/ClockSource.h"
 
-#if defined(QUILL_ENABLE_IMMEDIATE_FLUSH)
-  #error "Replace QUILL_ENABLE_IMMEDIATE_FLUSH with LoggerPolicy::enable_immediate_flush"
-#endif
 
 QUILL_BEGIN_NAMESPACE
 

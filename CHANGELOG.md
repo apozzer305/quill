@@ -107,9 +107,7 @@
 ## Unreleased
 
 - Added `LoggerPolicy` for per-logger clock types and automatic-flush support. Derive from it to override
-  defaults; replace `UserClockSource`, clock enum arguments, and `QUILL_ENABLE_IMMEDIATE_FLUSH` with a policy.
-- Defining the removed `QUILL_ENABLE_IMMEDIATE_FLUSH` flag before either logging header now reports
-  the policy migration error even when `Logger.h` was included first.
+  defaults; replace `UserClockSource` inheritance and clock enum arguments with a policy.
 - `Frontend::create_or_get_logger(name, source_logger)` retrieves existing loggers without copying
   the source clock, so lookups do not fail if a custom clock's copy constructor throws.
 - On macOS, `%(thread_name)` now shows thread names longer than 15 characters in full instead of
@@ -587,12 +585,12 @@ record on the hot path.
 
 ### API Changes
 
-- If you were previously setting `QUILL_ENABLE_IMMEDIATE_FLUSH` to `1`, this functionality has been moved to runtime
+- Immediate flushing previously selected at compile time has been moved to runtime
   with more flexibility. Instead of using a boolean flag, you can now specify the flush interval by calling
   `logger->set_immediate_flush(flush_every_n_messages)` on each logger instance. Set it to `1` for per-message flushing,
   or to a higher value to flush after that many messages. Setting it to `0` disables
-  flushing which is the default behaviour. `QUILL_ENABLE_IMMEDIATE_FLUSH` still exists as a compile-time preprocessor
-  flag and is set to `1` by default. Setting `QUILL_ENABLE_IMMEDIATE_FLUSH 0` in the preprocessor will eliminate the
+  flushing which is the default behaviour. In this release, the compile-time switch remains enabled
+  by default. Disabling it will eliminate the
   `if` branch from the hot path and disable this feature entirely, regardless of the value passed to
   `set_immediate_flush(flush_every_n_messages)`.
 

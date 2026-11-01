@@ -104,21 +104,16 @@ private:
   template <typename>
   friend class FrontendImpl;
 
-  /** Shared type identity; no per-logger storage or DLL-imported specialization. */
-  static inline detail::LoggerBase::TypeInfo const* type_info() noexcept
+  /** A shared token per specialization; only checked lookup without RTTI uses it. */
+  static inline void const* logger_type_id() noexcept
   {
-#if defined(_MSC_VER)
-    constexpr std::string_view type_name{__FUNCSIG__};
-#else
-    constexpr std::string_view type_name{__PRETTY_FUNCTION__};
-#endif
-    static constexpr detail::LoggerBase::TypeInfo info{type_name};
-    return &info;
+    static char token;
+    return &token;
   }
 
-  QUILL_NODISCARD detail::LoggerBase::TypeInfo const* get_type_info() const noexcept override
+  QUILL_NODISCARD void const* get_logger_type_id() const noexcept override
   {
-    return type_info();
+    return logger_type_id();
   }
 
   /** Cold dispatch through LoggerBase; normal logging calls log_statement() directly. */

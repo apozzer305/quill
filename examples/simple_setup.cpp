@@ -10,9 +10,9 @@
 
 int main()
 {
-  auto* console_logger = quill::simple_logger();
+  quill::Logger* console_logger = quill::simple_logger();
   quill::info(console_logger, "Hello from {}!", "Quill");
 
-  auto* file_logger = quill::simple_logger("simple_setup.log");
+  quill::Logger* file_logger = quill::simple_logger("simple_setup.log");
   quill::warning(file_logger, "This message goes to a file");
 }

@@ -17,7 +17,6 @@
   #include <atomic>
   #include <memory>
   #include <string>
-  #include <string_view>
   #include <vector>
 #endif
 
@@ -45,19 +44,12 @@ class SignalHandlerContext;
 /***/
 class LoggerBase
 {
-public:
-  /** Shared type identity for checked lookup without RTTI. */
-  struct TypeInfo
-  {
-    std::string_view name;
-  };
-
 private:
   template <typename>
   friend class ::quill::FrontendImpl;
   friend class SignalHandlerContext;
 
-  QUILL_NODISCARD virtual TypeInfo const* get_type_info() const noexcept = 0;
+  QUILL_NODISCARD virtual void const* get_logger_type_id() const noexcept = 0;
 
   /** Cold operations used by the signal handler through a base pointer. */
   virtual bool log_signal(MacroMetadata const* metadata, char const* description, uint32_t code) = 0;

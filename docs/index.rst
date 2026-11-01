@@ -26,16 +26,8 @@ events, compares available events by timestamp, and dispatches them to sinks.
 Quick Example
 -------------
 
-.. code-block:: cpp
-
-   #include "quill/LogMacros.h"
-   #include "quill/SimpleSetup.h"
-
-   int main()
-   {
-     auto* logger = quill::simple_logger();
-     LOG_INFO(logger, "Hello from {}!", "Quill");
-   }
+.. literalinclude:: snippets/quill_docs_quick_start_minimal.cpp
+   :language: cpp
 
 A macro-free interface (``quill::info()``, ``quill::warning()``, ...) is also available. The
 recommended ``LOG_*`` macros avoid evaluating arguments when a log level is disabled and keep
