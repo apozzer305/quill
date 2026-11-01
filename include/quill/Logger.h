@@ -100,6 +100,10 @@ public:
   /** Returns the concrete clock object or non-owned clock pointer. */
   QUILL_NODISCARD clock_t const& get_clock() const noexcept { return _clock; }
 
+private:
+  template <typename>
+  friend class FrontendImpl;
+
   /** Shared type identity; no per-logger storage or DLL-imported specialization. */
   static inline detail::LoggerBase::TypeInfo const* type_info() noexcept
   {
@@ -118,13 +122,14 @@ public:
   }
 
   /** Cold dispatch through LoggerBase; normal logging calls log_statement() directly. */
-  bool log_signal(MacroMetadata const* metadata, char const* description = "", uint32_t code = 0) override
+  bool log_signal(MacroMetadata const* metadata, char const* description, uint32_t code) override
   {
     return this->template log_statement<false>(metadata, description, code);
   }
 
   void flush_signal_handler() override { this->flush_log(0); }
 
+public:
   static constexpr bool using_unbounded_queue =
     (frontend_options_t::queue_type == QueueType::UnboundedBlocking) ||
     (frontend_options_t::queue_type == QueueType::UnboundedDropping);

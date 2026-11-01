@@ -227,6 +227,15 @@ public:
     return logger_base;
   }
 
+  /** Access private logger hooks through the existing signal-handler context. */
+  static bool log_signal(LoggerBase* logger, MacroMetadata const* metadata,
+                         char const* description = "", uint32_t code = 0)
+  {
+    return logger->log_signal(metadata, description, code);
+  }
+
+  static void flush_logger(LoggerBase* logger) { logger->flush_signal_handler(); }
+
   std::vector<std::string> excluded_logger_substrings{};
   std::string logger_name{};
   std::atomic<int32_t> signal_number{0};
@@ -256,7 +265,7 @@ private:
       static constexpr quill::MacroMetadata macro_metadata{                                        \
         "SignalHandler:~", "", fmt, nullptr, log_level, quill::MacroMetadata::Event::Log};         \
                                                                                                    \
-      logger->log_signal(&macro_metadata, ##__VA_ARGS__);                                          \
+      SignalHandlerContext::log_signal(logger, &macro_metadata, ##__VA_ARGS__);                    \
     }                                                                                              \
   } while (0)
 
@@ -322,7 +331,7 @@ void on_signal(int32_t signal_number)
       {
         // For SIGINT and SIGTERM, we are shutting down gracefully
         // Pass `0` to avoid calling std::this_thread::sleep_for()
-        logger->flush_signal_handler();
+        SignalHandlerContext::flush_logger(logger);
         std::_Exit(EXIT_SUCCESS);
       }
 
@@ -333,11 +342,11 @@ void on_signal(int32_t signal_number)
                                  signal_desc, signal_number);
 
         // This is here in order to flush the above log statement
-        logger->flush_signal_handler();
+        SignalHandlerContext::flush_logger(logger);
       }
       else
       {
-        logger->flush_signal_handler();
+        SignalHandlerContext::flush_logger(logger);
       }
     }
 
@@ -457,7 +466,7 @@ BOOL WINAPI on_console_signal(DWORD signal)
                                "Program interrupted by Ctrl+C or Ctrl+Break signal");
 
       // Pass `0` to avoid calling std::this_thread::sleep_for()
-      logger->flush_signal_handler();
+      SignalHandlerContext::flush_logger(logger);
       std::_Exit(EXIT_SUCCESS);
     }
   }
@@ -492,7 +501,7 @@ LONG WINAPI on_exception(EXCEPTION_POINTERS* exception_p)
                                exception_p->ExceptionRecord->ExceptionCode);
 
       // Pass `0` to avoid calling std::this_thread::sleep_for()
-      logger->flush_signal_handler();
+      SignalHandlerContext::flush_logger(logger);
     }
   }
 

@@ -30,6 +30,9 @@ class Sink;
 class PatternFormatter;
 class MacroMetadata;
 
+template <typename TFrontendOptions>
+class FrontendImpl;
+
 QUILL_END_EXPORT
 
 namespace detail
@@ -37,6 +40,7 @@ namespace detail
 class BackendWorker;
 class BacktraceStorage;
 class LoggerManager;
+class SignalHandlerContext;
 
 /***/
 class LoggerBase
@@ -48,12 +52,18 @@ public:
     std::string_view name;
   };
 
+private:
+  template <typename>
+  friend class ::quill::FrontendImpl;
+  friend class SignalHandlerContext;
+
   QUILL_NODISCARD virtual TypeInfo const* get_type_info() const noexcept = 0;
 
   /** Cold operations used by the signal handler through a base pointer. */
-  virtual bool log_signal(MacroMetadata const* metadata, char const* description = "", uint32_t code = 0) = 0;
+  virtual bool log_signal(MacroMetadata const* metadata, char const* description, uint32_t code) = 0;
   virtual void flush_signal_handler() = 0;
 
+public:
   /***/
   LoggerBase(std::string logger_name, std::vector<std::shared_ptr<Sink>> sinks,
              PatternFormatterOptions pattern_formatter_options, ClockSourceType clock_source)

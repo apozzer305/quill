@@ -169,10 +169,10 @@ TEST_CASE("compile_time_clock_sources")
     "signal {} {}",        nullptr,
     quill::LogLevel::Info, quill::MacroMetadata::Event::Log};
   quill::detail::LoggerBase* erased = custom;
-  REQUIRE(erased->log_signal(&signal_metadata, "test", 12));
+  REQUIRE(quill::detail::SignalHandlerContext::log_signal(erased, &signal_metadata, "test", 12));
 
   quill::Backend::start();
-  erased->flush_signal_handler();
+  quill::detail::SignalHandlerContext::flush_logger(erased);
   CHECK_EQ(simulation.reads.load(), 27);
   Frontend::remove_logger_blocking(clone);
   Frontend::remove_logger_blocking(custom);
