@@ -99,22 +99,30 @@ public:
   /** Returns the concrete clock object or non-owned clock pointer. */
   QUILL_NODISCARD clock_t const& get_clock() const noexcept { return _clock; }
 
-  /** Cold operations used through LoggerBase, including signal-handler logging. */
-  static inline detail::LoggerBase::FrontendFunctions const* frontend_functions() noexcept
+  /** Shared type identity; no per-logger storage or DLL-imported specialization. */
+  static inline detail::LoggerBase::TypeInfo const* type_info() noexcept
   {
 #if defined(_MSC_VER)
     constexpr std::string_view type_name{__FUNCSIG__};
 #else
     constexpr std::string_view type_name{__PRETTY_FUNCTION__};
 #endif
-    static constexpr detail::LoggerBase::FrontendFunctions functions{
-      [](detail::LoggerBase* logger, MacroMetadata const* metadata, char const* description, uint32_t code)
-      {
-        return static_cast<LoggerImpl*>(logger)->template log_statement<false>(metadata, description, code);
-      },
-      [](detail::LoggerBase* logger) { static_cast<LoggerImpl*>(logger)->flush_log(0); }, type_name};
-    return &functions;
+    static constexpr detail::LoggerBase::TypeInfo info{type_name};
+    return &info;
   }
+
+  QUILL_NODISCARD detail::LoggerBase::TypeInfo const* get_type_info() const noexcept override
+  {
+    return type_info();
+  }
+
+  /** Cold dispatch through LoggerBase; normal logging calls log_statement() directly. */
+  bool log_signal(MacroMetadata const* metadata, char const* description = "", uint32_t code = 0) override
+  {
+    return this->template log_statement<false>(metadata, description, code);
+  }
+
+  void flush_signal_handler() override { this->flush_log(0); }
 
   static constexpr bool using_unbounded_queue =
     (frontend_options_t::queue_type == QueueType::UnboundedBlocking) ||
@@ -692,8 +700,7 @@ private:
              PatternFormatterOptions pattern_formatter_options, clock_t clock)
     : detail::LoggerBase(static_cast<std::string&&>(logger_name),
                          static_cast<std::vector<std::shared_ptr<Sink>>&&>(sinks),
-                         static_cast<PatternFormatterOptions&&>(pattern_formatter_options),
-                         clock_source, frontend_functions()),
+                         static_cast<PatternFormatterOptions&&>(pattern_formatter_options), clock_source),
       _clock(static_cast<clock_t&&>(clock))
   {
     if constexpr (std::is_pointer_v<clock_t>)

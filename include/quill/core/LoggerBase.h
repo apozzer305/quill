@@ -42,33 +42,24 @@ class LoggerManager;
 class LoggerBase
 {
 public:
-  struct FrontendFunctions
+  /** Shared type identity for checked lookup without RTTI. */
+  struct TypeInfo
   {
-    bool (*log_signal)(LoggerBase*, MacroMetadata const*, char const*, uint32_t);
-    void (*flush)(LoggerBase*);
-    std::string_view type_name;
+    std::string_view name;
   };
 
-  QUILL_NODISCARD FrontendFunctions const* get_frontend_functions() const noexcept
-  {
-    return _frontend_functions;
-  }
+  QUILL_NODISCARD virtual TypeInfo const* get_type_info() const noexcept = 0;
 
-  bool log_signal(MacroMetadata const* metadata, char const* description = "", uint32_t code = 0)
-  {
-    return _frontend_functions->log_signal(this, metadata, description, code);
-  }
-
-  void flush_signal_handler() { _frontend_functions->flush(this); }
+  /** Cold operations used by the signal handler through a base pointer. */
+  virtual bool log_signal(MacroMetadata const* metadata, char const* description = "", uint32_t code = 0) = 0;
+  virtual void flush_signal_handler() = 0;
 
   /***/
   LoggerBase(std::string logger_name, std::vector<std::shared_ptr<Sink>> sinks,
-             PatternFormatterOptions pattern_formatter_options, ClockSourceType clock_source,
-             FrontendFunctions const* frontend_functions)
+             PatternFormatterOptions pattern_formatter_options, ClockSourceType clock_source)
     : _logger_name(static_cast<std::string&&>(logger_name)),
       _clock_source(clock_source),
-      _pattern_formatter_options(static_cast<PatternFormatterOptions&&>(pattern_formatter_options)),
-      _frontend_functions(frontend_functions)
+      _pattern_formatter_options(static_cast<PatternFormatterOptions&&>(pattern_formatter_options))
   {
     for (auto const& sink : sinks)
     {
@@ -243,7 +234,6 @@ protected:
   PatternFormatterOptions _pattern_formatter_options; /* Set by the frontend once and accessed by the backend to initialise PatternFormatter */
   std::vector<std::shared_ptr<Sink>> _sinks; /* Set by the frontend once and accessed by the backend */
   std::shared_ptr<PatternFormatter> _pattern_formatter; /* The backend thread will set this once, we never access it on the frontend */
-  FrontendFunctions const* const _frontend_functions; /* Cold frontend dispatch and logger type identity. */
   std::shared_ptr<BacktraceStorage> _backtrace_storage; /* The backend thread will construct this, we never access it on the frontend */
 };
 } // namespace detail

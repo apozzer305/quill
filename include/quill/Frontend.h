@@ -575,22 +575,22 @@ private:
 #if QUILL_USE_RTTI
     return dynamic_cast<LoggerImpl<frontend_options_t, TClock>*>(logger_base) != nullptr;
 #else
-    auto const* actual = logger_base->get_frontend_functions();
-    auto const* expected = LoggerImpl<frontend_options_t, TClock>::frontend_functions();
+    auto const* actual = logger_base->get_type_info();
+    auto const* expected = LoggerImpl<frontend_options_t, TClock>::type_info();
     if (actual == expected)
     {
       return true;
     }
 
-    // Hidden template instantiations can have separate tables across shared libraries.
+    // Hidden template instantiations can have separate type identities across shared libraries.
     // Compare compiler signatures for named types, but keep translation-unit-local types
     // distinct even when their printed names happen to match.
-    std::string_view const name = expected->type_name;
-    return name == actual->type_name && name.find("{anonymous}") == std::string_view::npos &&
+    std::string_view const name = expected->name;
+    return name == actual->name && name.find("{anonymous}") == std::string_view::npos &&
       name.find("anonymous namespace") == std::string_view::npos &&
       name.find("<unnamed") == std::string_view::npos && name.find("<lambda") == std::string_view::npos &&
-      name.find("(lambda at") == std::string_view::npos && name.find('`') == std::string_view::npos &&
-      name.find(")::") == std::string_view::npos;
+      name.find("(lambda at") == std::string_view::npos &&
+      name.find('`') == std::string_view::npos && name.find(")::") == std::string_view::npos;
 #endif
   }
 
