@@ -7,7 +7,6 @@
 
 #include <algorithm>
 #include <atomic>
-#include <chrono>
 #include <string>
 #include <thread>
 #include <type_traits>

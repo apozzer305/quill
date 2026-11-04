@@ -35,10 +35,9 @@ There are several ways to get the timestamp on the frontend:
 
 - **User**: This method allows the user to provide a custom timestamp in nanoseconds since epoch via ``UserClockSource``. This is useful, for example, in simulations where you want to display a custom timestamp rather than the current one in the log statements.
 
-Clock sources are selected when creating a logger; all sources use the same logger type and the
-same cached queue-writing implementation. TSC logging stays directly inline. System and user
-clocks use a small out-of-line entry wrapper to keep clock calls from affecting the TSC fast path;
-user timestamps still call ``UserClockSource::now()`` virtually.
+Clock sources are selected when creating a logger and do not change its C++ type. Log messages
+and static metric samples use cached queue reservations with every clock source. Custom clocks
+retain a virtual call to ``UserClockSource::now()``.
 
 Providing a Custom Timestamp
 ----------------------------
