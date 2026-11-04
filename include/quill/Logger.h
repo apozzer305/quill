@@ -125,60 +125,14 @@ public:
     QUILL_ASSERT(_valid.load(std::memory_order_acquire),
                  "Attempting to log with an invalidated logger");
 
-    if (_clock_source != ClockSourceType::Tsc)
+    if (QUILL_UNLIKELY(_clock_source != ClockSourceType::Tsc))
     {
-      return _log_statement_noinline<enable_immediate_flush, Args...>(
-        macro_metadata, 0, static_cast<Args&&>(fmt_args)...);
+      return _log_statement_non_tsc<enable_immediate_flush, Args...>(
+        macro_metadata, static_cast<Args&&>(fmt_args)...);
     }
 
-    uint64_t const current_timestamp = detail::rdtsc();
-    detail::ThreadContext* const thread_context = _thread_context;
-
-    if (QUILL_UNLIKELY(thread_context == nullptr))
-    {
-      return _log_statement_noinline<enable_immediate_flush, Args...>(
-        macro_metadata, current_timestamp, static_cast<Args&&>(fmt_args)...);
-    }
-
-    queue_t& queue = thread_context->get_spsc_queue<frontend_options_t::queue_type>();
-
-    size_t total_size = s_header_size +
-      detail::compute_encoded_size_and_cache_string_lengths(
-                          thread_context->get_conditional_arg_size_cache(), fmt_args...);
-
-    auto const reservation = queue.prepare_write_reserve_cached(total_size);
-
-    if (QUILL_UNLIKELY(reservation.write_buffer == nullptr))
-    {
-      return _log_statement_noinline<enable_immediate_flush, Args...>(
-        macro_metadata, current_timestamp, static_cast<Args&&>(fmt_args)...);
-    }
-
-    std::byte* write_buffer = reservation.write_buffer;
-
-#if defined(QUILL_ENABLE_ASSERTIONS) || !defined(NDEBUG)
-    std::byte const* const write_begin = write_buffer;
-#endif
-
-    write_buffer = _encode_header(
-      write_buffer, current_timestamp, reinterpret_cast<uintptr_t>(macro_metadata),
-      reinterpret_cast<uintptr_t>(this), reinterpret_cast<uintptr_t>(detail::decoder_ptr<Args...>));
-
-    detail::encode(write_buffer, thread_context->get_conditional_arg_size_cache(),
-                   static_cast<decltype(fmt_args)&&>(fmt_args)...);
-
-    QUILL_ASSERT_WITH_FMT(
-      write_buffer > write_begin,
-      "write_buffer must be greater than write_begin after encoding in log_statement(): msg=\"%s\"",
-      macro_metadata->message_format());
-    QUILL_ASSERT_WITH_FMT(
-      total_size == static_cast<size_t>(write_buffer - write_begin),
-      "Encoded bytes mismatch in log_statement(): total_size=%zu, actual_encoded=%zu, msg=\"%s\"",
-      total_size, static_cast<size_t>(write_buffer - write_begin), macro_metadata->message_format());
-
-    _commit_log_statement_reservation(reservation.bounded_queue,
-                                      reservation.writer_pos + total_size, enable_immediate_flush);
-    return true;
+    return _log_statement_with_timestamp<enable_immediate_flush, Args...>(
+      macro_metadata, detail::rdtsc(), static_cast<Args&&>(fmt_args)...);
   }
 
   /**
@@ -206,56 +160,12 @@ public:
     QUILL_ASSERT(_valid.load(std::memory_order_acquire),
                  "Attempting to log with an invalidated logger");
 
-    if (_clock_source != ClockSourceType::Tsc)
+    if (QUILL_UNLIKELY(_clock_source != ClockSourceType::Tsc))
     {
-      return _publish_metric_noinline(metric_metadata, 0, value);
+      return _publish_metric_non_tsc(metric_metadata, value);
     }
 
-    uint64_t const current_timestamp = detail::rdtsc();
-    detail::ThreadContext* const thread_context = _thread_context;
-
-    if (QUILL_UNLIKELY(thread_context == nullptr))
-    {
-      return _publish_metric_noinline(metric_metadata, current_timestamp, value);
-    }
-
-    queue_t& queue = thread_context->get_spsc_queue<frontend_options_t::queue_type>();
-
-    size_t total_size = s_header_size;
-
-    auto const reservation = queue.prepare_write_reserve_cached(total_size);
-
-    if (QUILL_UNLIKELY(reservation.write_buffer == nullptr))
-    {
-      return _publish_metric_noinline(metric_metadata, current_timestamp, value);
-    }
-
-    std::byte* write_buffer = reservation.write_buffer;
-
-#if defined(QUILL_ENABLE_ASSERTIONS) || !defined(NDEBUG)
-    std::byte const* const write_begin = write_buffer;
-#endif
-
-    // Since the decoder ptr is unused in the header we can use it to store the value
-    uint64_t value_bits;
-    std::memcpy(&value_bits, &value, sizeof(value_bits));
-
-    write_buffer = _encode_header(write_buffer, current_timestamp, reinterpret_cast<uintptr_t>(metric_metadata),
-                                  reinterpret_cast<uintptr_t>(this), value_bits);
-
-    QUILL_ASSERT_WITH_FMT(
-      write_buffer > write_begin,
-      "write_buffer must be greater than write_begin after encoding in publish_metric(): "
-      "metric_source=\"%s\"",
-      metric_metadata->source_location());
-    QUILL_ASSERT_WITH_FMT(
-      total_size == static_cast<size_t>(write_buffer - write_begin),
-      "Encoded bytes mismatch in publish_metric(): total_size=%zu, actual_encoded=%zu, "
-      "metric_source=\"%s\"",
-      total_size, static_cast<size_t>(write_buffer - write_begin), metric_metadata->source_location());
-
-    queue.finish_and_commit_write_reservation(reservation.writer_pos + total_size);
-    return true;
+    return _publish_metric_with_timestamp(metric_metadata, detail::rdtsc(), value);
   }
 
   /**
@@ -686,17 +596,134 @@ private:
   }
 
   /**
+   * Keep System/User clock calls out of the TSC caller's register allocation, then use the same
+   * cached queue reservation and encoding path. Preserve the original argument types for decoding.
+   */
+  template <bool enable_immediate_flush, typename... OriginalArgs>
+  QUILL_NODISCARD QUILL_NOINLINE bool _log_statement_non_tsc(MacroMetadata const* macro_metadata,
+                                                             detail::slow_path_arg_t<OriginalArgs>... fmt_args)
+  {
+    return _log_statement_with_timestamp<enable_immediate_flush, OriginalArgs...>(
+      macro_metadata, _get_non_tsc_timestamp(), static_cast<OriginalArgs&&>(fmt_args)...);
+  }
+
+  /***/
+  template <bool enable_immediate_flush, typename... Args>
+  QUILL_ATTRIBUTE_HOT inline bool _log_statement_with_timestamp(MacroMetadata const* macro_metadata,
+                                                                uint64_t current_timestamp, Args&&... fmt_args)
+  {
+    detail::ThreadContext* const thread_context = _thread_context;
+
+    if (QUILL_UNLIKELY(thread_context == nullptr))
+    {
+      return _log_statement_noinline<enable_immediate_flush, Args...>(
+        macro_metadata, current_timestamp, static_cast<Args&&>(fmt_args)...);
+    }
+
+    queue_t& queue = thread_context->get_spsc_queue<frontend_options_t::queue_type>();
+
+    size_t total_size = s_header_size +
+      detail::compute_encoded_size_and_cache_string_lengths(
+                          thread_context->get_conditional_arg_size_cache(), fmt_args...);
+
+    auto const reservation = queue.prepare_write_reserve_cached(total_size);
+
+    if (QUILL_UNLIKELY(reservation.write_buffer == nullptr))
+    {
+      return _log_statement_noinline<enable_immediate_flush, Args...>(
+        macro_metadata, current_timestamp, static_cast<Args&&>(fmt_args)...);
+    }
+
+    std::byte* write_buffer = reservation.write_buffer;
+
+#if defined(QUILL_ENABLE_ASSERTIONS) || !defined(NDEBUG)
+    std::byte const* const write_begin = write_buffer;
+#endif
+
+    write_buffer = _encode_header(
+      write_buffer, current_timestamp, reinterpret_cast<uintptr_t>(macro_metadata),
+      reinterpret_cast<uintptr_t>(this), reinterpret_cast<uintptr_t>(detail::decoder_ptr<Args...>));
+
+    detail::encode(write_buffer, thread_context->get_conditional_arg_size_cache(),
+                   static_cast<decltype(fmt_args)&&>(fmt_args)...);
+
+    QUILL_ASSERT_WITH_FMT(
+      write_buffer > write_begin,
+      "write_buffer must be greater than write_begin after encoding in log_statement(): msg=\"%s\"",
+      macro_metadata->message_format());
+    QUILL_ASSERT_WITH_FMT(
+      total_size == static_cast<size_t>(write_buffer - write_begin),
+      "Encoded bytes mismatch in log_statement(): total_size=%zu, actual_encoded=%zu, msg=\"%s\"",
+      total_size, static_cast<size_t>(write_buffer - write_begin), macro_metadata->message_format());
+
+    _commit_log_statement_reservation(reservation.bounded_queue,
+                                      reservation.writer_pos + total_size, enable_immediate_flush);
+    return true;
+  }
+
+  /** Same clock-call boundary as _log_statement_non_tsc. */
+  QUILL_NODISCARD QUILL_NOINLINE bool _publish_metric_non_tsc(MetricMetadata const* metric_metadata, double value)
+  {
+    return _publish_metric_with_timestamp(metric_metadata, _get_non_tsc_timestamp(), value);
+  }
+
+  /***/
+  QUILL_ATTRIBUTE_HOT inline bool _publish_metric_with_timestamp(MetricMetadata const* metric_metadata,
+                                                                 uint64_t current_timestamp, double value)
+  {
+    detail::ThreadContext* const thread_context = _thread_context;
+
+    if (QUILL_UNLIKELY(thread_context == nullptr))
+    {
+      return _publish_metric_noinline(metric_metadata, current_timestamp, value);
+    }
+
+    queue_t& queue = thread_context->get_spsc_queue<frontend_options_t::queue_type>();
+
+    size_t total_size = s_header_size;
+
+    auto const reservation = queue.prepare_write_reserve_cached(total_size);
+
+    if (QUILL_UNLIKELY(reservation.write_buffer == nullptr))
+    {
+      return _publish_metric_noinline(metric_metadata, current_timestamp, value);
+    }
+
+    std::byte* write_buffer = reservation.write_buffer;
+
+#if defined(QUILL_ENABLE_ASSERTIONS) || !defined(NDEBUG)
+    std::byte const* const write_begin = write_buffer;
+#endif
+
+    // Since the decoder ptr is unused in the header we can use it to store the value
+    uint64_t value_bits;
+    std::memcpy(&value_bits, &value, sizeof(value_bits));
+
+    write_buffer = _encode_header(write_buffer, current_timestamp, reinterpret_cast<uintptr_t>(metric_metadata),
+                                  reinterpret_cast<uintptr_t>(this), value_bits);
+
+    QUILL_ASSERT_WITH_FMT(
+      write_buffer > write_begin,
+      "write_buffer must be greater than write_begin after encoding in publish_metric(): "
+      "metric_source=\"%s\"",
+      metric_metadata->source_location());
+    QUILL_ASSERT_WITH_FMT(
+      total_size == static_cast<size_t>(write_buffer - write_begin),
+      "Encoded bytes mismatch in publish_metric(): total_size=%zu, actual_encoded=%zu, "
+      "metric_source=\"%s\"",
+      total_size, static_cast<size_t>(write_buffer - write_begin), metric_metadata->source_location());
+
+    queue.finish_and_commit_write_reservation(reservation.writer_pos + total_size);
+    return true;
+  }
+
+  /**
    * Slow path for publish_metric. Mirrors _log_statement_noinline but uses a decoder that simply
    * consumes the queued metric value without involving the fmt argument store.
    */
   QUILL_NODISCARD QUILL_NOINLINE bool _publish_metric_noinline(MetricMetadata const* metric_metadata,
                                                                uint64_t current_timestamp, double value)
   {
-    if (current_timestamp == 0)
-    {
-      current_timestamp = _get_non_tsc_timestamp();
-    }
-
     if (QUILL_UNLIKELY(_thread_context == nullptr))
     {
       _thread_context = detail::get_local_thread_context<frontend_options_t>();
@@ -742,18 +769,12 @@ private:
   /**
    * Slow path for log_statement. Small, safely copyable arguments are accepted by value so the hot
    * caller can keep them in registers; all other arguments retain their original reference type.
-   * If current_timestamp is 0, a non-TSC timestamp is fetched.
    */
   template <bool enable_immediate_flush, typename... OriginalArgs>
   QUILL_NODISCARD QUILL_NOINLINE bool _log_statement_noinline(MacroMetadata const* macro_metadata,
                                                               uint64_t current_timestamp,
                                                               detail::slow_path_arg_t<OriginalArgs>... fmt_args)
   {
-    if (current_timestamp == 0)
-    {
-      current_timestamp = _get_non_tsc_timestamp();
-    }
-
     if (QUILL_UNLIKELY(_thread_context == nullptr))
     {
       _thread_context = detail::get_local_thread_context<frontend_options_t>();
@@ -800,10 +821,10 @@ private:
   }
 
   /**
-   * @brief Non-TSC timestamp path, kept noinline so that the compiler does not pull
-   * the System/UserClock loads and branches into the caller.
+   * @brief Read a System/User timestamp. The logging and metric entry wrappers keep these calls
+   * outside the inline TSC path.
    */
-  QUILL_NODISCARD QUILL_NOINLINE uint64_t _get_non_tsc_timestamp() const
+  QUILL_NODISCARD uint64_t _get_non_tsc_timestamp() const
   {
     if (_clock_source == ClockSourceType::System)
     {

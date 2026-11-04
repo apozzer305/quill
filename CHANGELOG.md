@@ -106,6 +106,8 @@
 
 ## Unreleased
 
+- System and user clocks now use cached queue reservations for log messages and metrics, reducing
+  frontend overhead while preserving runtime clock selection.
 - On macOS, `%(thread_name)` now shows thread names longer than 15 characters in full instead of
   only their first 15 characters.
 
