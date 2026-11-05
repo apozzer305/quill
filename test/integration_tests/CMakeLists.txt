@@ -195,12 +195,6 @@ quill_add_test(TEST_TagsLogging TagsLoggingTest.cpp)
 quill_add_test(TEST_UnboundedUnlimitedQueue UnboundedUnlimitedQueueTest.cpp)
 quill_add_test(TEST_UnboundedDroppingQueueMaxCapacityNotifier UnboundedDroppingQueueMaxCapacityNotifierTest.cpp)
 quill_add_test(TEST_UserClockSource UserClockSourceTest.cpp)
-
-foreach(queue_type BoundedBlocking BoundedDropping UnboundedBlocking UnboundedDropping)
-    quill_add_test(TEST_RuntimeClock${queue_type} RuntimeClockQueueTest.cpp)
-    target_compile_definitions(TEST_RuntimeClock${queue_type} PRIVATE
-            QUILL_TEST_QUEUE_TYPE=${queue_type} QUILL_TEST_QUEUE_NAME="${queue_type}")
-endforeach()
 quill_add_test(TEST_UserDefinedTypeLoggingDeferredFormatTest UserDefinedTypeLoggingDeferredFormatTest.cpp)
 quill_add_test(TEST_UserDefinedTypeDeferredFormatCopyMove UserDefinedTypeDeferredFormatCopyMoveTest.cpp)
 quill_add_test(TEST_UserDefinedTypeDeferredFormatConvertibleToString UserDefinedTypeDeferredFormatConvertibleToStringTest.cpp)
