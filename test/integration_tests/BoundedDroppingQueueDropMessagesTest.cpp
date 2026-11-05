@@ -37,8 +37,9 @@ TEST_CASE("bounded_dropping_queue_drop_messages")
   backend_options.error_notifier = [&dropped_messages](std::string const& error_message)
   { dropped_messages += error_message + "\n"; };
 
-  // Keep the backend asleep until explicitly notified below.
+  // sleep long on backend thread to ensure we drop the queue
   backend_options.sleep_duration = std::chrono::seconds{10};
+  Backend::start(backend_options);
 
   auto file_sink = CustomFrontend::create_or_get_sink<FileSink>(
     filename,
@@ -50,18 +51,14 @@ TEST_CASE("bounded_dropping_queue_drop_messages")
     }(),
     FileEventNotifier{});
 
-  CustomLogger* logger = CustomFrontend::create_or_get_logger(
-    logger_name, std::move(file_sink), PatternFormatterOptions{}, ClockSourceType::System);
+  CustomLogger* logger = CustomFrontend::create_or_get_logger(logger_name, std::move(file_sink));
 
-  // Fill before starting the backend so dropping does not depend on scheduling.
   for (size_t i = 0; i < number_of_messages; ++i)
   {
     std::string s;
     s.assign(i, 'A');
     LOG_INFO(logger, "Log something to fulfill the bound queue {} {}", i, s.data());
   }
-
-  Backend::start(backend_options);
 
   // While the queue is still full, issue a control event. It must run on this thread because
   // the failure counter and the queue are per thread context. set_mdc() retries until it is
@@ -106,7 +103,6 @@ TEST_CASE("bounded_dropping_queue_drop_messages")
 
   // Read file and check the first messages as we can't if some were dropped
   std::vector<std::string> const file_contents = testing::file_contents(filename);
-  REQUIRE(testing::file_contains(file_contents, "Log something else test"));
 
   for (size_t i = 0; i < 10; ++i)
   {

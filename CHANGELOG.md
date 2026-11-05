@@ -106,8 +106,8 @@
 
 ## Unreleased
 
-- System and user clocks now use cached queue reservations for log messages and metrics, while
-  preserving runtime clock selection and the TSC fast path.
+- Reduced frontend overhead for System/User clock logging and static metric samples while keeping
+  runtime clock selection and the TSC hot path unchanged.
 - On macOS, `%(thread_name)` now shows thread names longer than 15 characters in full instead of
   only their first 15 characters.
 

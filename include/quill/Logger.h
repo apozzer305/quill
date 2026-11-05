@@ -707,24 +707,15 @@ private:
 
     size_t total_size = s_header_size;
 
-    auto reservation = queue.prepare_write_reserve_cached(total_size);
+    std::byte* write_buffer = _reserve_queue_space(queue, total_size, metric_metadata, thread_context);
 
-    if (QUILL_UNLIKELY(reservation.write_buffer == nullptr))
+    if (QUILL_UNLIKELY(write_buffer == nullptr))
     {
-      std::byte* const reserved_buffer =
-        _reserve_queue_space(queue, total_size, metric_metadata, thread_context);
-      if (QUILL_UNLIKELY(reserved_buffer == nullptr))
-      {
-        return false;
-      }
-
-      // Queue recovery may refresh the reader cache or replace the producer node.
-      reservation = queue.prepare_write_reserve_cached(total_size);
-      QUILL_ASSERT(reservation.write_buffer == reserved_buffer,
-                   "Recovered queue reservation mismatch");
+      return false;
     }
 
-    std::byte* write_buffer = reservation.write_buffer;
+    // Keep commit state across the encoding stores, after any queue recovery.
+    auto const reservation = queue.prepare_write_reserve_cached(total_size);
 
 #if defined(QUILL_ENABLE_ASSERTIONS) || !defined(NDEBUG)
     std::byte const* const write_begin = write_buffer;
@@ -778,23 +769,15 @@ private:
       detail::compute_encoded_size_and_cache_string_lengths(
                           thread_context->get_conditional_arg_size_cache(), fmt_args...);
 
-    auto reservation = queue.prepare_write_reserve_cached(total_size);
+    std::byte* write_buffer = _reserve_queue_space(queue, total_size, macro_metadata, thread_context);
 
-    if (QUILL_UNLIKELY(reservation.write_buffer == nullptr))
+    if (QUILL_UNLIKELY(write_buffer == nullptr))
     {
-      std::byte* const reserved_buffer = _reserve_queue_space(queue, total_size, macro_metadata, thread_context);
-      if (QUILL_UNLIKELY(reserved_buffer == nullptr))
-      {
-        return false;
-      }
-
-      // Queue recovery may refresh the reader cache or replace the producer node.
-      reservation = queue.prepare_write_reserve_cached(total_size);
-      QUILL_ASSERT(reservation.write_buffer == reserved_buffer,
-                   "Recovered queue reservation mismatch");
+      return false;
     }
 
-    std::byte* write_buffer = reservation.write_buffer;
+    // Keep commit state across the encoding stores, after any queue recovery.
+    auto const reservation = queue.prepare_write_reserve_cached(total_size);
 
 #if defined(QUILL_ENABLE_ASSERTIONS) || !defined(NDEBUG)
     std::byte const* const write_begin = write_buffer;
